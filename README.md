@@ -54,6 +54,25 @@ cd adapters/echo && npm install && npm start
 On a simulator use `http://127.0.0.1:8787`; on a phone use the LAN address (or
 a Tailscale one).
 
+## Off your LAN
+
+The relay binds `0.0.0.0`, so a phone on the same Wi-Fi reaches it directly.
+For anywhere else, put a tunnel in front and set `PUBLIC_URL` — that is the
+address the app hands to agents, and it is what the connect QR encodes:
+
+```bash
+cloudflared tunnel --url http://localhost:8787   # prints a https://… URL
+echo 'PUBLIC_URL=https://your-tunnel-url' >> relay/.env
+./dev.sh
+```
+
+Anything reachable works — Tailscale, ngrok, a real domain. Note that a
+Cloudflare quick tunnel gets a new URL every restart, so agents pointed at the
+old one need updating; a named tunnel or Tailscale address is stable.
+
+**Rotate `RELAY_TOKEN` before exposing the relay.** It is the only thing
+between the internet and every thread you have.
+
 ## Adding your own agent
 
 `+` → **New Agent**. Give it a name and an emoji; the relay mints a connect
@@ -87,8 +106,8 @@ work through the backlog.
   ~120-line client to copy when writing your own.
 - **[adapters/ollama/](adapters/ollama/README.md)** — Ollama, llama.cpp, vLLM.
 - **[adapters/hermes/](adapters/hermes/README.md)** — a Hermes gateway platform
-  plugin, so sessions and memory live in Hermes. `install.sh` sets it up in one
-  command, with the arguments the app hands you.
+  plugin, so sessions and memory live in Hermes. One command:
+  `hermes plugins install allanyu/outside/adapters/hermes/agentinbox`.
 - **[adapters/openclaw/](adapters/openclaw/README.md)** — stub. The relay half
   is written; the OpenClaw channel binding is not.
 

@@ -8,23 +8,38 @@ a `plugin.yaml`, an `__init__.py` that exports `register`, and a
 
 ## Install
 
-In the app: `+` → **New Agent**, name it, and it hands you this line with the
-arguments already filled in. Run it on the machine where Hermes lives:
-
 ```bash
-./install.sh <hermes-checkout> <relay-url> <connect-token>
+hermes plugins install allanyu/outside/adapters/hermes/agentinbox
+hermes plugins enable agentinbox-platform
 ```
 
-It copies the plugin into `plugins/platforms/agentinbox`, checks the relay is
-reachable from that machine, and writes `AGENTINBOX_RELAY_URL` and
-`AGENTINBOX_TOKEN` into the checkout's `.env`. Re-running it updates both
-rather than appending duplicates.
+Hermes clones the plugin, pins the exact revision, and prompts for the two
+values from `plugin.yaml` — the relay URL and the connect token that `+` →
+**New Agent** gave you in the app. `hermes plugins update` upgrades it later.
 
-Then:
+Then enable the platform in `~/.hermes/config.yaml`:
+
+```yaml
+platforms:
+  agentinbox:
+    enabled: true
+```
+
+and start the gateway:
 
 ```bash
 hermes gateway
 ```
+
+The first message from the app gets a pairing code, the same as any other
+Hermes platform. Approve it once:
+
+```bash
+hermes pairing approve agentinbox <CODE>
+```
+
+`install.sh` is still here for a checkout you want to point at directly, but
+`hermes plugins install` is the normal path.
 
 The agent appears in the inbox as soon as the gateway connects, and the app's
 connect screen flips to "Connected".
