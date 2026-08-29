@@ -178,6 +178,15 @@ class AgentInboxAdapter(BasePlatformAdapter):
     # outbound
     # ------------------------------------------------------------------ #
 
+    async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
+        thread = self._threads.get(chat_id, {})
+        kind = thread.get("kind", "dm")
+        return {
+            "name": thread.get("name") or kind,
+            "type": "dm" if kind == "dm" else "group",
+            "participants": thread.get("participant_ids", []),
+        }
+
     async def send(
         self,
         chat_id: str,

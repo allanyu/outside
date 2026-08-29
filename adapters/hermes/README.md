@@ -70,6 +70,27 @@ changes, these are the things to re-check:
   through the enum's `_missing_()` hook, no core edit needed
 - `register(ctx)` calling `ctx.register_platform(...)`
 
+## What has been verified
+
+Against a copy of a real Hermes v0.20.6 install (git layout), with the real
+`gateway` package imported and a stand-in for the AIAgent in place of the model:
+
+- the plugin installs where `Platform._scan_bundled_plugin_platforms()` finds
+  it, so `Platform("agentinbox")` resolves
+- `register(ctx)` produces a valid `PlatformEntry` — every kwarg it passes is
+  an accepted field, and the factory returns a working adapter
+- `AgentInboxAdapter` satisfies the abstract contract: `connect`, `disconnect`,
+  `send`, `get_chat_info`
+- `connect()` registers with the relay and the agent goes online in the app
+- an inbound DM flows through the real `BasePlatformAdapter.handle_message`
+  (session keying included) to the handler, and the reply goes back out through
+  the real `_send_with_retry` into this adapter's `send()`
+- in a group it stays quiet unless `@mentioned`; in a DM it always answers
+
+**Not** verified: the real AIAgent behind the handler, `hermes gateway setup`
+listing the platform, and anything to do with the desktop app's own gateway
+lifecycle.
+
 ## Not implemented
 
 Attachments, streaming edits, approval cards, and typing indicators. The relay
