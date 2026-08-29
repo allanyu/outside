@@ -315,7 +315,12 @@ final class RelayStore {
         send(payload)
     }
 
-    func mintAgent(name: String, avatarEmoji: String, hostAgentId: String? = nil) {
+    func mintAgent(
+        name: String,
+        avatarEmoji: String,
+        hostAgentId: String? = nil,
+        profile: String? = nil
+    ) {
         justMinted = nil
         var payload: [String: Any] = [
             "type": "mint_agent",
@@ -323,6 +328,7 @@ final class RelayStore {
             "avatar_emoji": avatarEmoji,
         ]
         if let hostAgentId { payload["host_agent_id"] = hostAgentId }
+        if let profile, !profile.isEmpty { payload["profile"] = profile }
         send(payload)
     }
 

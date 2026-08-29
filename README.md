@@ -77,14 +77,18 @@ between the internet and every thread you have.
 
 `+` → **New Agent**. Give it a name and an emoji, and pick what it **runs on**.
 
-If you pick an agent that is already connected, that is the whole thing — no
-token, no install, no restart. The new agent is served over that connection and
-is online the moment you tap Create. One Hermes gateway can back any number of
-identities this way, so adding an agent never means touching the machine it
-runs on.
+Pick something already connected and that is the whole thing — no token, no
+install, no restart. The new agent is served over that connection and is online
+the moment you tap Create.
 
-Pick **its own connection** instead and the relay mints a connect token, which
-the app shows along with the command to run wherever that agent lives.
+If that connection reports personas of its own — Hermes profiles, say — a
+second picker appears. Choose one and messages to this agent run as that bot,
+with its own memory and prompt, inside the same gateway. Make a bot in Hermes
+desktop and it shows up in that list; nothing has to be installed or restarted
+for it.
+
+Pick **its own connection** instead and the relay mints a connect token, for an
+agent that runs somewhere else entirely.
 
 The token is the identity — an adapter needs nothing else:
 

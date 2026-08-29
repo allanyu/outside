@@ -15,6 +15,10 @@ struct Agent: Codable, Identifiable, Hashable {
     /// Set when this agent is served over another agent's connection, so it
     /// needed no setup wherever that agent runs.
     var hostId: String?
+    /// Which of the host's personas answers as this agent.
+    var profile: String?
+    /// Personas this agent reported it can answer as (Hermes profiles, say).
+    var availableProfiles: [String]?
 
     var isOnline: Bool { status == "online" }
     var hasConnectToken: Bool { !(connectToken ?? "").isEmpty }

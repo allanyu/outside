@@ -58,6 +58,21 @@ With a connect token the name and emoji come from the app. With the shared
 `RELAY_TOKEN` instead, set `AGENTINBOX_AGENT_ID`, `AGENTINBOX_AGENT_NAME` (the
 `@handle`) and `AGENTINBOX_AVATAR` yourself.
 
+## One gateway, every bot
+
+The adapter reports its Hermes profiles to the relay on connect, so they appear
+in the app under **New Agent → Runs on → Bot**. Picking one stamps
+``SessionSource.profile`` on every message for that agent, which is what routes
+the turn to that profile's session, memory and prompt.
+
+Set ``gateway.multiplex_profiles: true`` in ``~/.hermes/config.yaml`` for this
+to work — profile-scoped session keys are gated on it.
+
+One gateway process therefore backs every bot you have. Do **not** also run
+``hermes -p <name> gateway`` for the same profile: two adapters registering the
+same platform end up sharing one send path, and replies come back under the
+wrong name.
+
 ## How it maps
 
 | Agent Inbox            | Hermes                                        |

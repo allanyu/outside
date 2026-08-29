@@ -10,6 +10,7 @@ struct NewAgentView: View {
     @State private var emoji = "🤖"
     @State private var waiting = false
     @State private var hostId: String?
+    @State private var profile: String?
 
     private let suggestions = ["🤖", "🧠", "🦙", "🐙", "🛰️", "📎", "🔭", "🧪"]
 
@@ -18,6 +19,15 @@ struct NewAgentView: View {
     }
 
     /// Mirrors the relay's slug rule so the field previews the real handle.
+    private var selectedHost: Agent? {
+        hostId.flatMap { store.agent($0) }
+    }
+
+    /// The personas that host reported — Hermes profiles, for instance.
+    private func hostProfiles(_ host: Agent) -> [String] {
+        host.availableProfiles ?? []
+    }
+
     private var handle: String {
         let allowed = Set("abcdefghijklmnopqrstuvwxyz0123456789")
         let mapped = trimmedName.lowercased().map { allowed.contains($0) ? $0 : "-" }
@@ -70,6 +80,13 @@ struct NewAgentView: View {
                         }
                         Text("Its own connection").tag(String?.none)
                     }
+                    if let host = selectedHost, !hostProfiles(host).isEmpty {
+                        Picker("Bot", selection: $profile) {
+                            ForEach(hostProfiles(host), id: \.self) { name in
+                                Text(name).tag(Optional(name))
+                            }
+                        }
+                    }
                 } header: {
                     Text("Runs on")
                 } footer: {
@@ -82,6 +99,9 @@ struct NewAgentView: View {
                 // Default to running on something already connected — that is
                 // the path with no setup at all.
                 if hostId == nil { hostId = store.possibleHosts.first?.id }
+                if profile == nil, let host = selectedHost {
+                    profile = hostProfiles(host).first
+                }
             }
             .navigationTitle("New Agent")
             .navigationBarTitleDisplayMode(.inline)
@@ -95,7 +115,8 @@ struct NewAgentView: View {
                         store.mintAgent(
                             name: trimmedName,
                             avatarEmoji: emoji,
-                            hostAgentId: hostId
+                            hostAgentId: hostId,
+                            profile: profile
                         )
                     }
                     .disabled(trimmedName.isEmpty || waiting)

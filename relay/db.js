@@ -21,7 +21,10 @@ export function openDb(dataDir) {
       connect_token TEXT,
       -- When set, this agent has no connection of its own: it is served over
       -- the socket of the agent named here.
-      host_id       TEXT
+      host_id       TEXT,
+      -- Optional hint for the host: which of its own personas/profiles should
+      -- answer as this agent.
+      profile       TEXT
     );
 
     CREATE TABLE IF NOT EXISTS threads (
@@ -78,6 +81,12 @@ export function openDb(dataDir) {
   if (!columns.includes("host_id")) {
     db.exec("ALTER TABLE agents ADD COLUMN host_id TEXT");
   }
+  if (!columns.includes("profile")) {
+    db.exec("ALTER TABLE agents ADD COLUMN profile TEXT");
+  }
+  if (!columns.includes("available_profiles")) {
+    db.exec("ALTER TABLE agents ADD COLUMN available_profiles TEXT");
+  }
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_connect_token ON agents (connect_token) WHERE connect_token IS NOT NULL"
   );
@@ -103,12 +112,22 @@ export function upsertAgent({ id, name, avatar_emoji }) {
   return getAgent(id);
 }
 
+function hydrateAgent(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    available_profiles: row.available_profiles
+      ? JSON.parse(row.available_profiles)
+      : [],
+  };
+}
+
 export function getAgent(id) {
-  return db.prepare("SELECT * FROM agents WHERE id = ?").get(id);
+  return hydrateAgent(db.prepare("SELECT * FROM agents WHERE id = ?").get(id));
 }
 
 export function listAgents() {
-  return db.prepare("SELECT * FROM agents ORDER BY name").all();
+  return db.prepare("SELECT * FROM agents ORDER BY name").all().map(hydrateAgent);
 }
 
 export function createAgentWithToken({
@@ -117,17 +136,29 @@ export function createAgentWithToken({
   avatar_emoji,
   connect_token,
   host_id = null,
+  profile = null,
 }) {
   db.prepare(
-    `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, connect_token, host_id)
-     VALUES (?, ?, ?, 'offline', 0, ?, ?)`
-  ).run(id, name, avatar_emoji, connect_token, host_id);
+    `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, connect_token, host_id, profile)
+     VALUES (?, ?, ?, 'offline', 0, ?, ?, ?)`
+  ).run(id, name, avatar_emoji, connect_token, host_id, profile);
   return getAgent(id);
+}
+
+/** Personas/profiles a connected agent says it can answer as. */
+export function setAgentProfiles(id, profiles) {
+  db.prepare("UPDATE agents SET available_profiles = ? WHERE id = ?").run(
+    JSON.stringify(profiles ?? []),
+    id
+  );
 }
 
 /** Agents served over `hostId`'s connection rather than one of their own. */
 export function agentsHostedBy(hostId) {
-  return db.prepare("SELECT * FROM agents WHERE host_id = ?").all(hostId);
+  return db
+    .prepare("SELECT * FROM agents WHERE host_id = ?")
+    .all(hostId)
+    .map(hydrateAgent);
 }
 
 export function setAgentHost(id, hostId) {
@@ -137,7 +168,9 @@ export function setAgentHost(id, hostId) {
 
 export function getAgentByConnectToken(token) {
   if (!token) return null;
-  return db.prepare("SELECT * FROM agents WHERE connect_token = ?").get(token);
+  return hydrateAgent(
+    db.prepare("SELECT * FROM agents WHERE connect_token = ?").get(token)
+  );
 }
 
 /** Removes the agent and any thread it leaves with no agents in it. */

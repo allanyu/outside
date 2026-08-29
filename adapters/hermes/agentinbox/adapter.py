@@ -15,7 +15,8 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlsplit, urlunsplit, urlencode
 
 import websockets
@@ -79,6 +80,8 @@ class AgentInboxAdapter(BasePlatformAdapter):
         self._hosted: Dict[str, Dict[str, Any]] = {}
         # thread id -> the identity that should answer in it
         self._identity_for_thread: Dict[str, str] = {}
+        # agent id -> the Hermes profile that should answer as it
+        self._profile_for_agent: Dict[str, str] = {}
 
     # ------------------------------------------------------------------ #
     # connection
@@ -128,18 +131,36 @@ class AgentInboxAdapter(BasePlatformAdapter):
         """A token minted in the app already names one agent."""
         return self.token.startswith("aic_")
 
+    @property
+    def _hermes_home(self) -> Path:
+        return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+
+    def _profile_names(self) -> List[str]:
+        """Profiles on this machine, so the app can offer them."""
+        names = ["default"]
+        profiles_dir = self._hermes_home / "profiles"
+        if profiles_dir.is_dir():
+            names += sorted(
+                p.name for p in profiles_dir.iterdir()
+                if p.is_dir() and (p / "config.yaml").exists()
+            )
+        return names
+
     def _register_frame(self) -> Dict[str, Any]:
         # With a connect token the relay knows who we are, and claiming a
         # different agent_id is rejected. Only name ourselves when connecting
         # with the shared relay token.
+        frame: Dict[str, Any] = {"type": "register", "profiles": self._profile_names()}
         if self._uses_connect_token:
-            return {"type": "register"}
-        return {
-            "type": "register",
-            "agent_id": self.agent_id,
-            "name": self.agent_name,
-            "avatar_emoji": self.avatar,
-        }
+            return frame
+        frame.update(
+            {
+                "agent_id": self.agent_id,
+                "name": self.agent_name,
+                "avatar_emoji": self.avatar,
+            }
+        )
+        return frame
 
     async def _send_json(self, payload: Dict[str, Any]) -> None:
         if self._ws is None:
@@ -244,6 +265,13 @@ class AgentInboxAdapter(BasePlatformAdapter):
             user_name=sender,
             message_id=message.get("id"),
         )
+        # Route the turn to the Hermes profile this identity stands for. One
+        # gateway can answer as any of its profiles this way, so adding a bot
+        # in the app needs no new process.
+        profile = self._profile_for_agent.get(identity)
+        if profile and profile != "default":
+            source.profile = profile
+
         event = MessageEvent(
             text=message.get("text", ""),
             message_type=MessageType.TEXT,
@@ -261,6 +289,9 @@ class AgentInboxAdapter(BasePlatformAdapter):
         if not agent_id:
             return
         self._hosted[agent_id] = agent
+        profile = (agent.get("profile") or "").strip()
+        if profile:
+            self._profile_for_agent[agent_id] = profile
         for thread in threads:
             self._threads[thread["id"]] = thread
             self._identity_for_thread[thread["id"]] = agent_id

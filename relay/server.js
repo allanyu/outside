@@ -68,7 +68,7 @@ function slugify(name) {
  * The name doubles as the @handle that mention routing matches on, so it has
  * to be unique -- two agents called "hermes" would both answer to @hermes.
  */
-function mintAgent({ name, avatar_emoji, host_agent_id = null }) {
+function mintAgent({ name, avatar_emoji, host_agent_id = null, profile = null }) {
   const base = slugify(name);
   const taken = (handle) =>
     db.getAgent(handle) ||
@@ -89,6 +89,7 @@ function mintAgent({ name, avatar_emoji, host_agent_id = null }) {
     avatar_emoji: avatar_emoji?.trim() || "🤖",
     connect_token: host ? null : mintToken(),
     host_id: host?.id ?? null,
+    profile: host ? profile : null,
   });
 
   const { thread, created } = ensureDm(handle);
@@ -236,10 +237,10 @@ app.post("/api/agents/register", requireToken, (req, res) => {
 });
 
 app.post("/api/agents/mint", requireToken, (req, res) => {
-  const { name, avatar_emoji, host_agent_id } = req.body || {};
+  const { name, avatar_emoji, host_agent_id, profile } = req.body || {};
   if (!name) return res.status(400).json({ error: "name required" });
   try {
-    const agent = mintAgent({ name, avatar_emoji, host_agent_id });
+    const agent = mintAgent({ name, avatar_emoji, host_agent_id, profile });
     res.json({ agent, relay_url: publicUrl() });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -464,6 +465,7 @@ function handleAppMessage(ws, msg) {
         name: msg.name,
         avatar_emoji: msg.avatar_emoji,
         host_agent_id: msg.host_agent_id ?? null,
+        profile: msg.profile ?? null,
       });
       sendJson(ws, { type: "agent_minted", agent, relay_url: publicUrl() });
       break;
@@ -530,6 +532,7 @@ function handleAgentMessage(ws, msg) {
     ws.agentId = id;
     agentSockets.set(id, ws);
 
+    if (Array.isArray(msg.profiles)) db.setAgentProfiles(id, msg.profiles);
     const agent = registerAgent({
       agent_id: id,
       name: msg.name,
