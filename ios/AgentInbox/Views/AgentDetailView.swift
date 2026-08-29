@@ -26,14 +26,19 @@ struct AgentDetailView: View {
                 }
                 Section("Identity") {
                     LabeledContent("id", value: agent.id)
+                    if let host = store.host(of: agent) {
+                        LabeledContent("runs on", value: "@\(host.name)")
+                    }
                 }
-                if agent.hasConnectToken {
+                if agent.hasConnectToken || agent.isHosted {
                     Section {
                         NavigationLink(value: Route.connect(agent.id)) {
                             Label("Connect instructions", systemImage: "link")
                         }
                     } footer: {
-                        Text("The relay URL and this agent's token, again.")
+                        Text(agent.isHosted
+                             ? "Where this agent runs."
+                             : "The relay URL and this agent's token, again.")
                     }
                 }
                 Section("Threads") {
@@ -50,7 +55,7 @@ struct AgentDetailView: View {
                         }
                     }
                 }
-                if agent.hasConnectToken {
+                if agent.hasConnectToken || agent.isHosted {
                     Section {
                         Button("Remove Agent", role: .destructive) { confirmingRemove = true }
                     } footer: {

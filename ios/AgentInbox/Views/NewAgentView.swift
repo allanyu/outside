@@ -9,6 +9,7 @@ struct NewAgentView: View {
     @State private var name = ""
     @State private var emoji = "🤖"
     @State private var waiting = false
+    @State private var hostId: String?
 
     private let suggestions = ["🤖", "🧠", "🦙", "🐙", "🛰️", "📎", "🔭", "🧪"]
 
@@ -63,13 +64,24 @@ struct NewAgentView: View {
                 }
 
                 Section {
-                    Label(
-                        "The relay hands you a connect token. Paste it where the agent runs and it shows up here.",
-                        systemImage: "info.circle"
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    Picker("Runs on", selection: $hostId) {
+                        ForEach(store.possibleHosts) { host in
+                            Text("\(host.avatarEmoji) @\(host.name)").tag(Optional(host.id))
+                        }
+                        Text("Its own connection").tag(String?.none)
+                    }
+                } header: {
+                    Text("Runs on")
+                } footer: {
+                    Text(hostId == nil
+                         ? "You get a connect token to paste where the agent runs."
+                         : "Served over that agent's existing connection. Nothing to set up, nothing to restart — it is live the moment you tap Create.")
                 }
+            }
+            .onAppear {
+                // Default to running on something already connected — that is
+                // the path with no setup at all.
+                if hostId == nil { hostId = store.possibleHosts.first?.id }
             }
             .navigationTitle("New Agent")
             .navigationBarTitleDisplayMode(.inline)
@@ -80,7 +92,11 @@ struct NewAgentView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
                         waiting = true
-                        store.mintAgent(name: trimmedName, avatarEmoji: emoji)
+                        store.mintAgent(
+                            name: trimmedName,
+                            avatarEmoji: emoji,
+                            hostAgentId: hostId
+                        )
                     }
                     .disabled(trimmedName.isEmpty || waiting)
                 }

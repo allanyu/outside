@@ -28,7 +28,17 @@ struct AgentConnectView: View {
 
     var body: some View {
         List {
-            if let agent {
+            if let agent, agent.isHosted {
+                Section { header(agent) }
+                Section {
+                    Label(
+                        "Runs on @\(store.host(of: agent)?.name ?? "another agent")'s connection. Nothing to install, nothing to configure.",
+                        systemImage: "checkmark.seal"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                }
+            } else if let agent {
                 Section { header(agent) }
 
                 Section {

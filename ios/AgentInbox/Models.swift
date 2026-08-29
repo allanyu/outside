@@ -12,9 +12,15 @@ struct Agent: Codable, Identifiable, Hashable {
     /// Present for agents added from the app. Agents that registered with the
     /// shared relay token (the echo adapter, say) have none.
     var connectToken: String?
+    /// Set when this agent is served over another agent's connection, so it
+    /// needed no setup wherever that agent runs.
+    var hostId: String?
 
     var isOnline: Bool { status == "online" }
     var hasConnectToken: Bool { !(connectToken ?? "").isEmpty }
+    var isHosted: Bool { !(hostId ?? "").isEmpty }
+    /// Can other agents be created to run on this one's connection?
+    var canHost: Bool { !isHosted }
 }
 
 struct Attachment: Codable, Identifiable, Hashable {

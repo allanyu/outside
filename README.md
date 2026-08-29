@@ -75,10 +75,16 @@ between the internet and every thread you have.
 
 ## Adding your own agent
 
-`+` → **New Agent**. Give it a name and an emoji; the relay mints a connect
-token and the app shows it, along with the command to run wherever the agent
-lives. The agent appears in the inbox the moment it connects, and the screen
-you're looking at flips to "Connected".
+`+` → **New Agent**. Give it a name and an emoji, and pick what it **runs on**.
+
+If you pick an agent that is already connected, that is the whole thing — no
+token, no install, no restart. The new agent is served over that connection and
+is online the moment you tap Create. One Hermes gateway can back any number of
+identities this way, so adding an agent never means touching the machine it
+runs on.
+
+Pick **its own connection** instead and the relay mints a connect token, which
+the app shows along with the command to run wherever that agent lives.
 
 The token is the identity — an adapter needs nothing else:
 

@@ -18,7 +18,10 @@ export function openDb(dataDir) {
       avatar_emoji  TEXT NOT NULL DEFAULT '🤖',
       status        TEXT NOT NULL DEFAULT 'offline',
       last_seen     INTEGER NOT NULL DEFAULT 0,
-      connect_token TEXT
+      connect_token TEXT,
+      -- When set, this agent has no connection of its own: it is served over
+      -- the socket of the agent named here.
+      host_id       TEXT
     );
 
     CREATE TABLE IF NOT EXISTS threads (
@@ -72,6 +75,9 @@ export function openDb(dataDir) {
   if (!columns.includes("connect_token")) {
     db.exec("ALTER TABLE agents ADD COLUMN connect_token TEXT");
   }
+  if (!columns.includes("host_id")) {
+    db.exec("ALTER TABLE agents ADD COLUMN host_id TEXT");
+  }
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_connect_token ON agents (connect_token) WHERE connect_token IS NOT NULL"
   );
@@ -105,11 +111,27 @@ export function listAgents() {
   return db.prepare("SELECT * FROM agents ORDER BY name").all();
 }
 
-export function createAgentWithToken({ id, name, avatar_emoji, connect_token }) {
+export function createAgentWithToken({
+  id,
+  name,
+  avatar_emoji,
+  connect_token,
+  host_id = null,
+}) {
   db.prepare(
-    `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, connect_token)
-     VALUES (?, ?, ?, 'offline', 0, ?)`
-  ).run(id, name, avatar_emoji, connect_token);
+    `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, connect_token, host_id)
+     VALUES (?, ?, ?, 'offline', 0, ?, ?)`
+  ).run(id, name, avatar_emoji, connect_token, host_id);
+  return getAgent(id);
+}
+
+/** Agents served over `hostId`'s connection rather than one of their own. */
+export function agentsHostedBy(hostId) {
+  return db.prepare("SELECT * FROM agents WHERE host_id = ?").all(hostId);
+}
+
+export function setAgentHost(id, hostId) {
+  db.prepare("UPDATE agents SET host_id = ? WHERE id = ?").run(hostId, id);
   return getAgent(id);
 }
 

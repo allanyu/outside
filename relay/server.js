@@ -68,7 +68,7 @@ function slugify(name) {
  * The name doubles as the @handle that mention routing matches on, so it has
  * to be unique -- two agents called "hermes" would both answer to @hermes.
  */
-function mintAgent({ name, avatar_emoji }) {
+function mintAgent({ name, avatar_emoji, host_agent_id = null }) {
   const base = slugify(name);
   const taken = (handle) =>
     db.getAgent(handle) ||
@@ -77,17 +77,36 @@ function mintAgent({ name, avatar_emoji }) {
   let handle = base;
   for (let n = 2; taken(handle); n++) handle = `${base}-${n}`;
 
+  // A hosted agent is served over an existing connection, so it needs no
+  // token of its own and nothing has to be configured where that agent runs.
+  const host = host_agent_id ? db.getAgent(host_agent_id) : null;
+  if (host_agent_id && !host) throw new Error("no such host agent");
+  if (host?.host_id) throw new Error("cannot host from a hosted agent");
+
   const agent = db.createAgentWithToken({
     id: handle,
     name: handle,
     avatar_emoji: avatar_emoji?.trim() || "🤖",
-    connect_token: mintToken(),
+    connect_token: host ? null : mintToken(),
+    host_id: host?.id ?? null,
   });
 
   const { thread, created } = ensureDm(handle);
   if (created) toApp({ type: "thread", thread: threadPayload(thread.id) });
-  toApp({ type: "agent_status", agent });
-  return agent;
+
+  // The host is already connected, so the new agent is live immediately.
+  if (host && agentSockets.has(host.id)) {
+    db.setAgentStatus(agent.id, "online");
+    toAgent(host.id, {
+      type: "host_agent_added",
+      agent: db.getAgent(agent.id),
+      threads: db.threadsForParticipant(agent.id),
+    });
+  }
+
+  const final = db.getAgent(agent.id);
+  toApp({ type: "agent_status", agent: final });
+  return final;
 }
 
 function ensureDm(agentId) {
@@ -149,8 +168,12 @@ function deliver(message, { skipAgents = false } = {}) {
 
   for (const pid of thread.participant_ids) {
     if (pid === USER_ID || pid === message.sender_id) continue;
-    toAgent(pid, {
+    const agent = db.getAgent(pid);
+    // A hosted agent has no socket; its traffic rides its host's.
+    const socketOwner = agent?.host_id ?? pid;
+    sendJson(agentSockets.get(socketOwner), {
       type: "inbound",
+      agent_id: pid,
       thread: { ...thread },
       message,
       mentioned: message.mentions.includes(pid),
@@ -213,10 +236,14 @@ app.post("/api/agents/register", requireToken, (req, res) => {
 });
 
 app.post("/api/agents/mint", requireToken, (req, res) => {
-  const { name, avatar_emoji } = req.body || {};
+  const { name, avatar_emoji, host_agent_id } = req.body || {};
   if (!name) return res.status(400).json({ error: "name required" });
-  const agent = mintAgent({ name, avatar_emoji });
-  res.json({ agent, relay_url: publicUrl() });
+  try {
+    const agent = mintAgent({ name, avatar_emoji, host_agent_id });
+    res.json({ agent, relay_url: publicUrl() });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.delete("/api/agents/:id", requireToken, (req, res) => {
@@ -433,7 +460,11 @@ function handleAppMessage(ws, msg) {
     }
     case "mint_agent": {
       if (!msg.name) throw new Error("name required");
-      const agent = mintAgent(msg);
+      const agent = mintAgent({
+        name: msg.name,
+        avatar_emoji: msg.avatar_emoji,
+        host_agent_id: msg.host_agent_id ?? null,
+      });
       sendJson(ws, { type: "agent_minted", agent, relay_url: publicUrl() });
       break;
     }
@@ -474,8 +505,10 @@ agentWss.on("connection", (ws) => {
     if (!ws.agentId) return;
     if (agentSockets.get(ws.agentId) === ws) {
       agentSockets.delete(ws.agentId);
-      db.setAgentStatus(ws.agentId, "offline");
-      toApp({ type: "agent_status", agent: db.getAgent(ws.agentId) });
+      for (const id of [ws.agentId, ...db.agentsHostedBy(ws.agentId).map((a) => a.id)]) {
+        db.setAgentStatus(id, "offline");
+        toApp({ type: "agent_status", agent: db.getAgent(id) });
+      }
       log(`agent offline: ${ws.agentId}`);
     }
   });
@@ -505,28 +538,58 @@ function handleAgentMessage(ws, msg) {
     });
     log(`agent online: ${id} (${agent.name})`);
 
-    const threads = db.threadsForParticipant(id);
-    sendJson(ws, { type: "registered", agent, threads, user_id: USER_ID });
-
-    // Backlog: everything in this agent's threads since it was last seen.
-    for (const thread of threads) {
-      for (const m of db.messagesForThread(thread.id, { since })) {
-        if (m.sender_id === id || m.kind === "status") continue;
-        sendJson(ws, {
-          type: "inbound",
-          thread,
-          message: m,
-          mentioned: m.mentions.includes(id),
-          backlog: true,
-        });
-      }
+    // Agents created in the app under this one are served over this socket.
+    const hosted = db.agentsHostedBy(id);
+    for (const h of hosted) {
+      db.setAgentStatus(h.id, "online");
+      toApp({ type: "agent_status", agent: db.getAgent(h.id) });
     }
-    db.touchAgentSeen(id, db.now());
+
+    const threads = db.threadsForParticipant(id);
+    sendJson(ws, {
+      type: "registered",
+      agent,
+      threads,
+      hosted: hosted.map((h) => ({
+        agent: db.getAgent(h.id),
+        threads: db.threadsForParticipant(h.id),
+      })),
+      user_id: USER_ID,
+    });
+
+    // Backlog: everything since last_seen, for this agent and everything it hosts.
+    for (const who of [{ id, threads }, ...hosted.map((h) => ({ id: h.id, threads: db.threadsForParticipant(h.id) }))]) {
+      for (const thread of who.threads) {
+        for (const m of db.messagesForThread(thread.id, { since })) {
+          if (m.sender_id === who.id || m.kind === "status") continue;
+          sendJson(ws, {
+            type: "inbound",
+            agent_id: who.id,
+            thread,
+            message: m,
+            mentioned: m.mentions.includes(who.id),
+            backlog: true,
+          });
+        }
+      }
+      db.touchAgentSeen(who.id, db.now());
+    }
     return;
   }
 
-  const agentId = ws.agentId;
-  if (!agentId) throw new Error("register first");
+  const connectionId = ws.agentId;
+  if (!connectionId) throw new Error("register first");
+
+  // A host connection may act as itself or as any agent it hosts.
+  const claimed = msg.agent_id;
+  let agentId = connectionId;
+  if (claimed && claimed !== connectionId) {
+    const target = db.getAgent(claimed);
+    if (!target || target.host_id !== connectionId) {
+      throw new Error(`not authorised to act as ${claimed}`);
+    }
+    agentId = claimed;
+  }
   db.touchAgentSeen(agentId, db.now());
 
   switch (msg.type) {

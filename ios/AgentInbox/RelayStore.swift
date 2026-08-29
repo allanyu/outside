@@ -315,9 +315,24 @@ final class RelayStore {
         send(payload)
     }
 
-    func mintAgent(name: String, avatarEmoji: String) {
+    func mintAgent(name: String, avatarEmoji: String, hostAgentId: String? = nil) {
         justMinted = nil
-        send(["type": "mint_agent", "name": name, "avatar_emoji": avatarEmoji])
+        var payload: [String: Any] = [
+            "type": "mint_agent",
+            "name": name,
+            "avatar_emoji": avatarEmoji,
+        ]
+        if let hostAgentId { payload["host_agent_id"] = hostAgentId }
+        send(payload)
+    }
+
+    /// Connected agents that a new one can be created under.
+    var possibleHosts: [Agent] {
+        agents.filter { $0.canHost && $0.isOnline }
+    }
+
+    func host(of agent: Agent) -> Agent? {
+        agent.hostId.flatMap { self.agent($0) }
     }
 
     func deleteAgent(_ agentId: String) {

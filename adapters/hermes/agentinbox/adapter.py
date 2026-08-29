@@ -56,7 +56,14 @@ class AgentInboxAdapter(BasePlatformAdapter):
 
         self._ws: Optional[Any] = None
         self._reader: Optional[asyncio.Task] = None
+        self._closing = False
         self._threads: Dict[str, Dict[str, Any]] = {}
+        # Agents the app created under this one. They have no connection of
+        # their own -- this socket carries them, so adding one in the app needs
+        # no change here and no restart.
+        self._hosted: Dict[str, Dict[str, Any]] = {}
+        # thread id -> the identity that should answer in it
+        self._identity_for_thread: Dict[str, str] = {}
 
     # ------------------------------------------------------------------ #
     # connection
@@ -70,6 +77,7 @@ class AgentInboxAdapter(BasePlatformAdapter):
         return urlunsplit((scheme, parts.netloc, "/ws/agent", query, ""))
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
+        self._closing = False
         # The relay replays everything since last_seen on register, so a
         # reconnect never loses messages and the flag needs no special case.
         if not self.token:
@@ -98,6 +106,7 @@ class AgentInboxAdapter(BasePlatformAdapter):
         return True
 
     async def disconnect(self) -> None:
+        self._closing = True
         if self._reader:
             self._reader.cancel()
             self._reader = None
@@ -127,17 +136,60 @@ class AgentInboxAdapter(BasePlatformAdapter):
             raise
         except Exception as exc:
             logger.warning("[AgentInbox] read loop ended: %s", exc)
-            self._mark_disconnected()
+        self._mark_disconnected()
+        # The relay restarting is routine (it is a small local process), so
+        # reconnect here rather than waiting to be rebuilt.
+        await self._reconnect_forever()
+
+    async def _reconnect_forever(self) -> None:
+        backoff = 1.0
+        while not self._closing:
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 30.0)
+            if self._closing:
+                return
+            try:
+                self._ws = await websockets.connect(self._socket_url)
+            except Exception as exc:
+                logger.info("[AgentInbox] reconnect failed (%s), retrying", exc)
+                continue
+            await self._send_json(
+                {
+                    "type": "register",
+                    "agent_id": self.agent_id,
+                    "name": self.agent_name,
+                    "avatar_emoji": self.avatar,
+                }
+            )
+            self._mark_connected()
+            logger.info("[AgentInbox] reconnected to %s", self.relay_url)
+            self._reader = asyncio.create_task(self._read_loop())
+            return
 
     async def _dispatch(self, payload: Dict[str, Any]) -> None:
         kind = payload.get("type")
         if kind == "registered":
             for thread in payload.get("threads", []):
                 self._threads[thread["id"]] = thread
+                self._identity_for_thread[thread["id"]] = self.agent_id
+            for entry in payload.get("hosted", []) or []:
+                self._adopt_hosted(entry.get("agent") or {}, entry.get("threads") or [])
+            if self._hosted:
+                logger.info(
+                    "[AgentInbox] also serving %s", ", ".join(sorted(self._hosted))
+                )
+            return
+        if kind == "host_agent_added":
+            agent = payload.get("agent") or {}
+            self._adopt_hosted(agent, payload.get("threads") or [])
+            logger.info("[AgentInbox] now also serving @%s", agent.get("name"))
             return
         if kind == "thread":
             thread = payload["thread"]
             self._threads[thread["id"]] = thread
+            return
+        if kind == "error":
+            logger.warning("[AgentInbox] relay error: %s", payload.get("error"))
             return
         if kind != "inbound":
             return
@@ -146,8 +198,14 @@ class AgentInboxAdapter(BasePlatformAdapter):
         message = payload.get("message") or {}
         self._threads[thread.get("id", "")] = thread
 
-        if message.get("sender_id") == self.agent_id:
+        # Which identity this message is addressed to -- this one, or one of
+        # the agents created in the app under it.
+        identity = payload.get("agent_id") or self.agent_id
+        if message.get("sender_id") == identity:
             return
+        thread_id = thread.get("id", "")
+        if thread_id:
+            self._identity_for_thread[thread_id] = identity
         # DMs are always for us; in groups the relay tells us when we were @-ed.
         if thread.get("kind") != "dm" and not payload.get("mentioned"):
             return
@@ -155,7 +213,7 @@ class AgentInboxAdapter(BasePlatformAdapter):
         sender = message.get("sender_id", "user")
         source = SessionSource(
             platform=self.platform,
-            chat_id=thread.get("id", ""),
+            chat_id=thread_id,
             chat_name=thread.get("name") or thread.get("kind", "thread"),
             chat_type="dm" if thread.get("kind") == "dm" else "group",
             user_id=sender,
@@ -173,6 +231,15 @@ class AgentInboxAdapter(BasePlatformAdapter):
             reply_to_message_id=message.get("reply_to"),
         )
         await self.handle_message(event)
+
+    def _adopt_hosted(self, agent: Dict[str, Any], threads: list) -> None:
+        agent_id = agent.get("id")
+        if not agent_id:
+            return
+        self._hosted[agent_id] = agent
+        for thread in threads:
+            self._threads[thread["id"]] = thread
+            self._identity_for_thread[thread["id"]] = agent_id
 
     # ------------------------------------------------------------------ #
     # outbound
@@ -194,10 +261,13 @@ class AgentInboxAdapter(BasePlatformAdapter):
         reply_to: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> SendResult:
+        # Answer as whichever identity was addressed in this thread.
+        identity = self._identity_for_thread.get(chat_id, self.agent_id)
         try:
             await self._send_json(
                 {
                     "type": "send",
+                    "agent_id": identity,
                     "thread_id": chat_id,
                     "text": content,
                     "reply_to": reply_to,

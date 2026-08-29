@@ -40,6 +40,18 @@ online), `send {thread_id, text, reply_to?, mentions?}`,
 Server → agent: `registered {agent, threads}`, `inbound {thread, message, mentioned}`,
 `decision {approval_id, decision, thread_id}`.
 
+### Hosted agents
+
+An agent can be created **under** an already-connected one
+(`mint_agent {name, host_agent_id}`). It gets no token: its traffic rides the
+host's socket, tagged with `agent_id` on `inbound`, and the host answers as it
+by putting `agent_id` on `send`. The host is told about it immediately with
+`host_agent_added`, and picks up the full list from `registered.hosted` on
+reconnect. Hosted agents go online and offline with their host.
+
+This is what makes adding an agent a purely in-app action: nothing has to be
+installed or restarted wherever the host runs.
+
 ### Two kinds of token
 
 `RELAY_TOKEN` is the shared one: it authenticates the app, the REST API, and
