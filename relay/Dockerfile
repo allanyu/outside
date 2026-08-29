@@ -22,7 +22,8 @@ ENV NODE_ENV=production \
     DATA_DIR=/data
 
 EXPOSE 8787
-VOLUME ["/data"]
+# No VOLUME instruction: hosts like Railway reject it and mount their own
+# volume at DATA_DIR instead.
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
