@@ -8,6 +8,10 @@
 	<string>Agent Inbox</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<!-- Required by the App Store: names the icon set in the asset catalog.
+	     Xcode adds this itself only when it generates the Info.plist. -->
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>

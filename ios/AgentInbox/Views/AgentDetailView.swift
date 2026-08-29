@@ -26,19 +26,8 @@ struct AgentDetailView: View {
                 }
                 Section("Identity") {
                     LabeledContent("id", value: agent.id)
-                    if let host = store.host(of: agent) {
-                        LabeledContent("runs on", value: "@\(host.name)")
-                    }
-                }
-                if agent.hasConnectToken || agent.isHosted {
-                    Section {
-                        NavigationLink(value: Route.connect(agent.id)) {
-                            Label("Connect instructions", systemImage: "link")
-                        }
-                    } footer: {
-                        Text(agent.isHosted
-                             ? "Where this agent runs."
-                             : "The relay URL and this agent's token, again.")
+                    if let profile = agent.profile {
+                        LabeledContent("profile", value: profile)
                     }
                 }
                 Section("Threads") {
@@ -55,28 +44,9 @@ struct AgentDetailView: View {
                         }
                     }
                 }
-                if agent.hasConnectToken || agent.isHosted {
-                    Section {
-                        Button("Remove Agent", role: .destructive) { confirmingRemove = true }
-                    } footer: {
-                        Text("Revokes the token and deletes its DM. Threads it shared with other agents stay.")
-                    }
-                }
             } else {
                 ContentUnavailableView("Unknown agent", systemImage: "questionmark.circle")
             }
-        }
-        .confirmationDialog(
-            "Remove @\(agent?.name ?? "")?",
-            isPresented: $confirmingRemove,
-            titleVisibility: .visible
-        ) {
-            Button("Remove", role: .destructive) {
-                store.deleteAgent(agentId)
-                dismiss()
-            }
-        } message: {
-            Text("Its connect token stops working. You can add it again later with a new one.")
         }
         .navigationTitle(agent?.name ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)

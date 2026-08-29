@@ -37,9 +37,6 @@ final class RelayStore {
     /// its own LAN address, which is not what the app connected to on a
     /// simulator (127.0.0.1) or over Tailscale.
     var agentFacingURL: String = ""
-    /// Set when the relay confirms a newly minted agent, so the sheet can push
-    /// straight to its connect instructions.
-    var justMinted: Agent?
     /// Who this device is signed in as.
     var account: Account?
     /// The most recent invite this account created.
@@ -227,7 +224,6 @@ final class RelayStore {
         let account: Account?
     }
     private struct InviteEvent: Decodable { let invite: Invite; let relayUrl: String? }
-    private struct MintedEvent: Decodable { let agent: Agent; let relayUrl: String? }
     private struct AgentRemovedEvent: Decodable { let agentId: String; let threadIds: [String] }
     private struct MessageEvent: Decodable { let message: Message }
     private struct StatusEvent: Decodable {
@@ -302,16 +298,6 @@ final class RelayStore {
             if let url = e.relayUrl { agentFacingURL = url }
             lastInvite = e.invite
 
-        case "agent_minted":
-            guard let e = decode(MintedEvent.self, data) else { return }
-            if let url = e.relayUrl { agentFacingURL = url }
-            if let i = agents.firstIndex(where: { $0.id == e.agent.id }) {
-                agents[i] = e.agent
-            } else {
-                agents.append(e.agent)
-            }
-            justMinted = e.agent
-
         case "agent_removed":
             guard let e = decode(AgentRemovedEvent.self, data) else { return }
             agents.removeAll { $0.id == e.agentId }
@@ -373,44 +359,8 @@ final class RelayStore {
         send(payload)
     }
 
-    func createThread(kind: String, name: String?, participantIds: [String]) {
-        var payload: [String: Any] = [
-            "type": "create_thread",
-            "kind": kind,
-            "participant_ids": participantIds,
-        ]
-        if let name, !name.isEmpty { payload["name"] = name }
-        send(payload)
-    }
-
-    func mintAgent(
-        name: String,
-        avatarEmoji: String,
-        hostAgentId: String? = nil,
-        profile: String? = nil
-    ) {
-        justMinted = nil
-        var payload: [String: Any] = [
-            "type": "mint_agent",
-            "name": name,
-            "avatar_emoji": avatarEmoji,
-        ]
-        if let hostAgentId { payload["host_agent_id"] = hostAgentId }
-        if let profile, !profile.isEmpty { payload["profile"] = profile }
-        send(payload)
-    }
-
-    /// Connected agents that a new one can be created under.
-    var possibleHosts: [Agent] {
-        agents.filter { $0.canHost && $0.isOnline }
-    }
-
     func host(of agent: Agent) -> Agent? {
         agent.hostId.flatMap { self.agent($0) }
-    }
-
-    func deleteAgent(_ agentId: String) {
-        send(["type": "delete_agent", "agent_id": agentId])
     }
 
     /// The link that puts an invited person straight into their own account.
@@ -422,10 +372,10 @@ final class RelayStore {
         return "agentinbox://join?url=\(encoded)&code=\(invite.code)"
     }
 
-    /// The line to run on the machine where Hermes lives.
-    func hermesInstallCommand(for agent: Agent) -> String {
-        let url = agentFacingURL.isEmpty ? relayURL : agentFacingURL
-        return "./adapters/hermes/install.sh <hermes-checkout> \(url) \(agent.connectToken ?? "")"
+    /// Rotate this chat's session on the backend. The chat stays; the
+    /// transcript starts over and the profile keeps its long-term memory.
+    func startNewSession(in threadId: String) {
+        send(["type": "new_session", "thread_id": threadId])
     }
 
     func decide(approvalId: String, decision: String) {

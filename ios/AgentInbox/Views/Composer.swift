@@ -152,6 +152,13 @@ struct Composer: View {
     }
 
     private func send() {
+        // The desktop app rotates a session with /new, so accept it here too.
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if trimmed == "/new" || trimmed == "/reset" {
+            store.startNewSession(in: threadId)
+            draft = ""
+            return
+        }
         store.send(text: draft, in: threadId, attachments: pendingAttachments)
         draft = ""
         pendingAttachments = []

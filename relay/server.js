@@ -406,16 +406,75 @@ app.get("/files/:id", (req, res) => {
  * shared actions
  * ------------------------------------------------------------------ */
 
-function registerAgent({ agent_id, name, avatar_emoji, online, account_id }) {
+/**
+ * `isTransport` marks the connection itself. A connection is not a chat: the
+ * chats are the profiles it reports, one each. Without this the gateway would
+ * show up as a conversation alongside the bots it carries.
+ */
+function registerAgent({ agent_id, name, avatar_emoji, online, account_id, isTransport = false }) {
   db.upsertAgent({ id: agent_id, name, avatar_emoji, account_id });
   if (online) db.setAgentStatus(agent_id, "online");
   const agent = db.getAgent(agent_id);
-  const { thread, created } = ensureDm(agent_id);
-  if (created) {
-    toApp(agent.account_id, { type: "thread", thread: threadPayload(thread.id) });
+  if (isTransport) {
+    // It may have been a chat before it reported profiles. It is not one now.
+    const stale = db.findDm(agent_id);
+    if (stale) {
+      db.deleteThread(stale.id);
+      toApp(agent.account_id, {
+        type: "agent_removed",
+        agent_id: null,
+        thread_ids: [stale.id],
+      });
+    }
+  } else {
+    const { thread, created } = ensureDm(agent_id);
+    if (created) {
+      toApp(agent.account_id, { type: "thread", thread: threadPayload(thread.id) });
+    }
   }
   toApp(agent.account_id, { type: "agent_status", agent });
   return agent;
+}
+
+/**
+ * One chat per profile the connection reports, and no others. Profiles are
+ * created and deleted on the backend; the app only mirrors them.
+ */
+function syncProfiles(connectionId, profiles, accountId) {
+  const wanted = new Map(
+    (profiles ?? []).map((name) => [slugify(name), String(name)])
+  );
+
+  for (const [id, profileName] of wanted) {
+    const existing = db.getAgent(id);
+    if (existing) {
+      db.setAgentHost(id, connectionId);
+      db.setAgentStatus(id, "online");
+    } else {
+      db.createAgentWithToken({
+        id,
+        name: profileName,
+        avatar_emoji: "🤖",
+        connect_token: null,
+        host_id: connectionId,
+        profile: profileName,
+        account_id: accountId,
+      });
+      log(`chat added for profile '${profileName}'`);
+    }
+    const { thread, created } = ensureDm(id);
+    if (created) {
+      toApp(accountId, { type: "thread", thread: threadPayload(thread.id) });
+    }
+    toApp(accountId, { type: "agent_status", agent: db.getAgent(id) });
+  }
+
+  // A profile deleted on the backend stops being a chat.
+  for (const hosted of db.agentsHostedBy(connectionId)) {
+    if (wanted.has(hosted.id)) continue;
+    log(`chat removed, profile '${hosted.name}' is gone`);
+    removeAgent(hosted.id);
+  }
 }
 
 function removeAgent(agentId) {
@@ -563,8 +622,26 @@ function handleAppMessage(ws, msg) {
       deliver(message);
       break;
     }
-    case "create_thread": {
-      createThreadFromApp({ ...msg, account_id: accountId });
+    // Chats mirror the backend's profiles, so the app cannot make one.
+    case "new_session": {
+      const thread = db.getThread(msg.thread_id);
+      if (!thread || thread.account_id !== accountId) {
+        throw new Error("no such thread");
+      }
+      const agentId = thread.participant_ids.find((p) => p !== USER_ID);
+      const agent = agentId ? db.getAgent(agentId) : null;
+      const updated = db.startNewSession(thread.id);
+      toApp(accountId, { type: "thread", thread: threadPayload(thread.id) });
+      // Tell the backend to rotate its own session for this profile.
+      if (agent?.host_id) {
+        toAgent(agent.host_id, {
+          type: "new_session",
+          agent_id: agent.id,
+          thread_id: thread.id,
+          profile: agent.profile,
+        });
+      }
+      log(`new session in ${agent?.name ?? thread.id}`);
       break;
     }
     case "decide": {
@@ -583,26 +660,6 @@ function handleAppMessage(ws, msg) {
       });
       break;
     }
-    case "mint_agent": {
-      if (!msg.name) throw new Error("name required");
-      const agent = mintAgent({
-        name: msg.name,
-        avatar_emoji: msg.avatar_emoji,
-        host_agent_id: msg.host_agent_id ?? null,
-        profile: msg.profile ?? null,
-        account_id: accountId,
-      });
-      sendJson(ws, { type: "agent_minted", agent, relay_url: publicUrl() });
-      break;
-    }
-    case "delete_agent": {
-      if (db.getAgent(msg.agent_id)?.account_id !== accountId) {
-        throw new Error("no such agent");
-      }
-      removeAgent(msg.agent_id);
-      break;
-    }
-
     // Invite someone else onto this relay. They get their own account: their
     // own agents, their own threads, no sight of yours.
     case "create_invite": {
@@ -680,7 +737,11 @@ function handleAgentMessage(ws, msg) {
       avatar_emoji: msg.avatar_emoji,
       online: true,
       account_id: ws.accountId,
+      isTransport: Array.isArray(msg.profiles) && msg.profiles.length > 0,
     });
+    if (Array.isArray(msg.profiles) && msg.profiles.length) {
+      syncProfiles(id, msg.profiles, ws.accountId);
+    }
     log(`agent online: ${id} (${agent.name})`);
 
     // Agents created in the app under this one are served over this socket.

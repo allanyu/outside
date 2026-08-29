@@ -15,13 +15,10 @@
 		3DC2882DFA5F5F3710F6C87C /* AgentInboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */; };
 		3FB5A43CE142751669D232D9 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9386E40AD6E745250BE7A74D /* SetupView.swift */; };
 		500E3DB97D21E7ED942C7A4E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C91834E5F6BD5CE338B154 /* Models.swift */; };
-		7983F1101010233CA9F10201 /* NewGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCB2D4998FFEB87A8A3DA0F9 /* NewGroupView.swift */; };
 		7C56541BC4EA9D15751B23E2 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 949F491DFCCCD797044CD8B5 /* InboxView.swift */; };
 		83D8E8E6F602740A9EA60FE1 /* ApprovalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB4896D91023D800165B625 /* ApprovalCard.swift */; };
-		A908E5A94422CF7EBB6AB5CE /* AgentConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25B33FDCDAAE0C7BDDDE5A0B /* AgentConnectView.swift */; };
 		ABD81D56DC4E9DCB97EF7ECF /* ThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B34819FA2F847C79CA6915B /* ThreadView.swift */; };
 		BA34C40806ABF294F8CD4671 /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A171D822BA125D3D25E2160A /* MessageRow.swift */; };
-		C2F133711263D0C57AEFDF8F /* NewAgentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE0B5D4C3D4926BB000CAC1 /* NewAgentView.swift */; };
 		DFF925C0376761543C702F86 /* AgentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EE09788A26E16E57810E8D1 /* AgentDetailView.swift */; };
 /* End PBXBuildFile section */
 
@@ -30,9 +27,7 @@
 		0BD5C962D52184334A18D0E5 /* Composer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Composer.swift; sourceTree = "<group>"; };
 		1E51B677C02B7214828261ED /* RelayStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayStore.swift; sourceTree = "<group>"; };
 		1EB4896D91023D800165B625 /* ApprovalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalCard.swift; sourceTree = "<group>"; };
-		25B33FDCDAAE0C7BDDDE5A0B /* AgentConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentConnectView.swift; sourceTree = "<group>"; };
 		2B34819FA2F847C79CA6915B /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
-		2CE0B5D4C3D4926BB000CAC1 /* NewAgentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewAgentView.swift; sourceTree = "<group>"; };
 		65BC8F3C2CAD41A3D729B078 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		84C91834E5F6BD5CE338B154 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		8EE09788A26E16E57810E8D1 /* AgentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDetailView.swift; sourceTree = "<group>"; };
@@ -43,7 +38,6 @@
 		A171D822BA125D3D25E2160A /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
 		B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInboxApp.swift; sourceTree = "<group>"; };
 		B960D10E9692F8A5A19E45A3 /* InviteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteView.swift; sourceTree = "<group>"; };
-		BCB2D4998FFEB87A8A3DA0F9 /* NewGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGroupView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -80,15 +74,12 @@
 		C47C6FCE8D02DC34F67D5958 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				25B33FDCDAAE0C7BDDDE5A0B /* AgentConnectView.swift */,
 				8EE09788A26E16E57810E8D1 /* AgentDetailView.swift */,
 				1EB4896D91023D800165B625 /* ApprovalCard.swift */,
 				0BD5C962D52184334A18D0E5 /* Composer.swift */,
 				949F491DFCCCD797044CD8B5 /* InboxView.swift */,
 				B960D10E9692F8A5A19E45A3 /* InviteView.swift */,
 				A171D822BA125D3D25E2160A /* MessageRow.swift */,
-				2CE0B5D4C3D4926BB000CAC1 /* NewAgentView.swift */,
-				BCB2D4998FFEB87A8A3DA0F9 /* NewGroupView.swift */,
 				9386E40AD6E745250BE7A74D /* SetupView.swift */,
 				2B34819FA2F847C79CA6915B /* ThreadView.swift */,
 			);
@@ -166,7 +157,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A908E5A94422CF7EBB6AB5CE /* AgentConnectView.swift in Sources */,
 				DFF925C0376761543C702F86 /* AgentDetailView.swift in Sources */,
 				3DC2882DFA5F5F3710F6C87C /* AgentInboxApp.swift in Sources */,
 				83D8E8E6F602740A9EA60FE1 /* ApprovalCard.swift in Sources */,
@@ -176,8 +166,6 @@
 				2B87C244C0EE81EF7EA2DD58 /* InviteView.swift in Sources */,
 				BA34C40806ABF294F8CD4671 /* MessageRow.swift in Sources */,
 				500E3DB97D21E7ED942C7A4E /* Models.swift in Sources */,
-				C2F133711263D0C57AEFDF8F /* NewAgentView.swift in Sources */,
-				7983F1101010233CA9F10201 /* NewGroupView.swift in Sources */,
 				0A024E31CC62363D7D21B62A /* RelayStore.swift in Sources */,
 				3FB5A43CE142751669D232D9 /* SetupView.swift in Sources */,
 				ABD81D56DC4E9DCB97EF7ECF /* ThreadView.swift in Sources */,

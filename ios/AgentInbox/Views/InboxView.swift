@@ -4,8 +4,6 @@ struct InboxView: View {
     @Environment(RelayStore.self) private var store
     @State private var path: [Route] = []
     @State private var showingSettings = false
-    @State private var showingNewGroup = false
-    @State private var showingNewAgent = false
     @State private var showingInvite = false
 
     var body: some View {
@@ -13,9 +11,9 @@ struct InboxView: View {
             List {
                 if store.threads.isEmpty {
                     ContentUnavailableView(
-                        "No threads yet",
+                        "No chats yet",
                         systemImage: "tray",
-                        description: Text("Tap + to add an agent, or start the echo adapter and @alpha and @beta appear here.")
+                        description: Text("Your chats mirror the bots on your Hermes. Start its gateway and they appear here.")
                     )
                     .listRowSeparator(.hidden)
                 }
@@ -31,7 +29,6 @@ struct InboxView: View {
                 switch route {
                 case .thread(let id): ThreadView(threadId: id)
                 case .agent(let id): AgentDetailView(agentId: id)
-                case .connect(let id): AgentConnectView(agentId: id)
                 }
             }
             .toolbar {
@@ -42,26 +39,10 @@ struct InboxView: View {
                 }
                 ToolbarItem(placement: .principal) { ConnectionRow() }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            showingNewAgent = true
-                        } label: {
-                            Label("New Agent", systemImage: "person.badge.plus")
-                        }
-                        Button {
-                            showingNewGroup = true
-                        } label: {
-                            Label("New Group", systemImage: "person.2.badge.plus")
-                        }
-                        .disabled(store.agents.isEmpty)
-                        Divider()
-                        Button {
-                            showingInvite = true
-                        } label: {
-                            Label("Invite someone", systemImage: "person.crop.circle.badge.plus")
-                        }
+                    Button {
+                        showingInvite = true
                     } label: {
-                        Image(systemName: "plus")
+                        Image(systemName: "person.crop.circle.badge.plus")
                     }
                 }
             }
@@ -71,8 +52,7 @@ struct InboxView: View {
             .onChange(of: store.agents.count) { prunePath() }
             .onChange(of: store.threads.count) { prunePath() }
             .sheet(isPresented: $showingSettings) { SetupView() }
-            .sheet(isPresented: $showingNewGroup) { NewGroupView() }
-            .sheet(isPresented: $showingNewAgent) { NewAgentView() }
+
             .sheet(isPresented: $showingInvite) { InviteView() }
         }
     }
@@ -85,7 +65,7 @@ struct InboxView: View {
     private func exists(_ route: Route) -> Bool {
         switch route {
         case .thread(let id): store.thread(id) != nil
-        case .agent(let id), .connect(let id): store.agent(id) != nil
+        case .agent(let id): store.agent(id) != nil
         }
     }
 }

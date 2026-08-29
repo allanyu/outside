@@ -113,6 +113,11 @@ export function openDb(dataDir) {
   if (!threadCols.includes("account_id")) {
     db.exec("ALTER TABLE threads ADD COLUMN account_id TEXT");
   }
+  // Starting a new session does not delete anything: the transcript simply
+  // begins here. Everything before stays in the table, unreachable.
+  if (!threadCols.includes("session_started_at")) {
+    db.exec("ALTER TABLE threads ADD COLUMN session_started_at INTEGER NOT NULL DEFAULT 0");
+  }
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_connect_token ON agents (connect_token) WHERE connect_token IS NOT NULL"
   );
@@ -270,6 +275,13 @@ export function getAgentByConnectToken(token) {
   );
 }
 
+export function deleteThread(threadId) {
+  db.prepare("DELETE FROM messages WHERE thread_id = ?").run(threadId);
+  db.prepare("DELETE FROM approvals WHERE thread_id = ?").run(threadId);
+  db.prepare("DELETE FROM thread_participants WHERE thread_id = ?").run(threadId);
+  db.prepare("DELETE FROM threads WHERE id = ?").run(threadId);
+}
+
 /** Removes the agent and any thread it leaves with no agents in it. */
 export function deleteAgent(id) {
   const threadIds = db
@@ -416,22 +428,33 @@ export function getMessage(id) {
 }
 
 export function messagesForThread(threadId, { since = null, limit = 100 } = {}) {
+  // Only the current session is visible.
+  const from = db
+    .prepare("SELECT session_started_at FROM threads WHERE id = ?")
+    .get(threadId)?.session_started_at ?? 0;
   if (since !== null) {
     return db
       .prepare(
-        "SELECT * FROM messages WHERE thread_id = ? AND created_at > ? ORDER BY created_at ASC"
+        "SELECT * FROM messages WHERE thread_id = ? AND created_at > ? AND created_at >= ? ORDER BY created_at ASC"
       )
-      .all(threadId, since)
+      .all(threadId, since, from)
       .map(hydrate);
   }
-  // last N, returned oldest-first
   return db
     .prepare(
-      "SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at DESC LIMIT ?"
+      "SELECT * FROM messages WHERE thread_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT ?"
     )
-    .all(threadId, limit)
+    .all(threadId, from, limit)
     .map(hydrate)
     .reverse();
+}
+
+export function startNewSession(threadId) {
+  db.prepare("UPDATE threads SET session_started_at = ? WHERE id = ?").run(
+    now(),
+    threadId
+  );
+  return getThread(threadId);
 }
 
 // Consecutive agent messages at the tail of the thread (reset by a user message).

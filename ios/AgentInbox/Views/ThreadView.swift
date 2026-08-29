@@ -4,6 +4,8 @@ struct ThreadView: View {
     @Environment(RelayStore.self) private var store
     let threadId: String
 
+    @State private var confirmingNewSession = false
+
     private var thread: ChatThread? { store.thread(threadId) }
     private var messages: [Message] { thread?.messages ?? [] }
 
@@ -50,17 +52,39 @@ struct ThreadView: View {
         .navigationTitle(thread.map(store.title(for:)) ?? "Thread")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let thread, let agentId = thread.agentIds.first, thread.isDM {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(value: Route.agent(agentId)) {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        confirmingNewSession = true
+                    } label: {
+                        Label("Start new session", systemImage: "arrow.counterclockwise")
+                    }
+                    if let agentId = thread?.agentIds.first {
+                        NavigationLink(value: Route.agent(agentId)) {
+                            Label("Details", systemImage: "info.circle")
+                        }
+                    }
+                } label: {
+                    if let agentId = thread?.agentIds.first {
                         AvatarView(
                             emoji: store.agent(agentId)?.avatarEmoji ?? "🤖",
                             online: store.agent(agentId)?.isOnline ?? false,
                             size: 30
                         )
+                    } else {
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            "Start a new session with \(thread.map(store.title(for:)) ?? "this bot")?",
+            isPresented: $confirmingNewSession,
+            titleVisibility: .visible
+        ) {
+            Button("Start new session") { store.startNewSession(in: threadId) }
+        } message: {
+            Text("The current conversation is cleared. Its long-term memory is kept.")
         }
     }
 
