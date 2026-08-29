@@ -7,7 +7,7 @@ const RELAY_URL = (process.env.RELAY_URL || "http://127.0.0.1:8787").replace(/\/
 const TOKEN = process.env.RELAY_TOKEN || "dev-token";
 // A connect token from the app already names the agent; AGENT_ID is only
 // needed when connecting with the shared relay token.
-const USES_CONNECT_TOKEN = TOKEN.startsWith("ai_");
+const USES_CONNECT_TOKEN = TOKEN.startsWith("aic_");
 const AGENT_ID = process.env.AGENT_ID || (USES_CONNECT_TOKEN ? null : "llama");
 const AGENT_NAME = process.env.AGENT_NAME || AGENT_ID || "agent";
 const AVATAR = process.env.AVATAR || "🦙";

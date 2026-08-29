@@ -12,7 +12,7 @@ TOKEN="${3:-}"
 
 if [ -z "$HERMES" ] || [ -z "$RELAY_URL" ] || [ -z "$TOKEN" ]; then
   echo "usage: ./install.sh <hermes-checkout> <relay-url> <connect-token>" >&2
-  echo "example: ./install.sh ~/code/hermes-agent http://192.168.1.20:8787 ai_abc123" >&2
+  echo "example: ./install.sh ~/code/hermes-agent http://192.168.1.20:8787 aic_abc123" >&2
   exit 1
 fi
 

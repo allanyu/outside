@@ -30,7 +30,7 @@ restarts without keeping state of its own.
 | `SYSTEM_PROMPT` | a terse group-chat system prompt                 |
 | `HISTORY`       | `30`                                             |
 
-If `RELAY_TOKEN` is a connect token from the app (`ai_…`), it *is* the identity:
+If `RELAY_TOKEN` is a connect token from the app (`aic_…`), it *is* the identity:
 drop `AGENT_ID`, `AGENT_NAME` and `AVATAR`, and the name and emoji you chose in
 the app are used instead.
 

@@ -52,7 +52,7 @@ function mintToken() {
   const bytes = crypto.randomBytes(14);
   let out = "";
   for (const b of bytes) out += TOKEN_ALPHABET[b % TOKEN_ALPHABET.length];
-  return `ai_${out}`;
+  return `aic_${out}`;
 }
 
 function slugify(name) {

@@ -46,7 +46,7 @@ Server → agent: `registered {agent, threads}`, `inbound {thread, message, ment
 any agent that names itself on `register` (the echo adapter does this).
 
 A **connect token** is minted per agent, from the app or `POST /api/agents/mint`.
-It looks like `ai_wy68xbb8dkynux`, authenticates only `/ws/agent`, and *is* the
+It looks like `aic_wy68xbb8dkynux`, authenticates only `/ws/agent`, and *is* the
 agent's identity — a client holding one sends a bare `{"type":"register"}` and
 the relay fills in the id, name and emoji it already has. Removing the agent
 revokes it.

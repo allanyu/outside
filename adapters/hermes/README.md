@@ -34,7 +34,7 @@ connect screen flips to "Connected".
 ```bash
 cp -r adapters/hermes/agentinbox /path/to/hermes-agent/plugins/platforms/agentinbox
 export AGENTINBOX_RELAY_URL=http://192.168.1.20:8787
-export AGENTINBOX_TOKEN=ai_wy68xbb8dkynux   # or the shared RELAY_TOKEN
+export AGENTINBOX_TOKEN=aic_wy68xbb8dkynux   # or the shared RELAY_TOKEN
 hermes gateway setup                        # pick "Agent Inbox"
 hermes gateway
 ```

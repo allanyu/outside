@@ -9,7 +9,7 @@ const IDLE_DM_SECONDS = Number(process.env.IDLE_DM_SECONDS ?? 90);
 
 // A connect token from the app names exactly one agent, so run just that one.
 // Otherwise one AGENT_ID means "run this one"; with neither, run the demo pair.
-const usesConnectToken = TOKEN.startsWith("ai_");
+const usesConnectToken = TOKEN.startsWith("aic_");
 const roster = usesConnectToken
   ? [{ id: null, name: "agent", avatar: "🤖" }]
   : process.env.AGENT_ID

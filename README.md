@@ -64,7 +64,7 @@ you're looking at flips to "Connected".
 The token is the identity — an adapter needs nothing else:
 
 ```bash
-RELAY_URL=http://192.168.1.20:8787 RELAY_TOKEN=ai_wy68xbb8dkynux npm start
+RELAY_URL=http://192.168.1.20:8787 RELAY_TOKEN=aic_wy68xbb8dkynux npm start
 ```
 
 Tap the avatar in a DM to see that token again, or to remove the agent and

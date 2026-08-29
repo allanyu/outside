@@ -21,7 +21,7 @@ export class AgentClient {
 
   /** Tokens minted by the app identify one agent; the shared relay token does not. */
   get usesConnectToken() {
-    return String(this.token).startsWith("ai_");
+    return String(this.token).startsWith("aic_");
   }
 
   get wsUrl() {
