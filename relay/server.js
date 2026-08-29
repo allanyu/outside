@@ -773,10 +773,20 @@ function handleAgentMessage(ws, msg) {
       user_id: USER_ID,
     });
 
-    // Backlog: everything since last_seen, for this agent and everything it hosts.
-    for (const who of [{ id, threads }, ...hosted.map((h) => ({ id: h.id, threads: db.threadsForParticipant(h.id) }))]) {
+    // Backlog: what each identity missed while it was away. Each one keeps
+    // its own last_seen -- using the connection's would replay conversations a
+    // hosted agent had already answered, and it would answer them twice.
+    const identities = [
+      { id, threads, since },
+      ...hosted.map((h) => ({
+        id: h.id,
+        threads: db.threadsForParticipant(h.id),
+        since: h.last_seen ?? 0,
+      })),
+    ];
+    for (const who of identities) {
       for (const thread of who.threads) {
-        for (const m of db.messagesForThread(thread.id, { since })) {
+        for (const m of db.messagesForThread(thread.id, { since: who.since })) {
           if (m.sender_id === who.id || m.kind === "status") continue;
           sendJson(ws, {
             type: "inbound",
@@ -795,6 +805,9 @@ function handleAgentMessage(ws, msg) {
 
   const connectionId = ws.agentId;
   if (!connectionId) throw new Error("register first");
+  // The connection is live whatever identity it speaks as, so its own
+  // last_seen has to move too or its backlog window never closes.
+  db.touchAgentSeen(connectionId, db.now());
 
   // A host connection may act as itself or as any agent it hosts.
   const claimed = msg.agent_id;

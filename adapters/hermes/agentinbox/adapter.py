@@ -406,6 +406,13 @@ class AgentInboxAdapter(BasePlatformAdapter):
         ):
             return SendResult(success=True)
 
+        # Hermes offers to make each new chat its cron/notification target.
+        # That is a per-platform setup question, not something to ask in every
+        # conversation -- /sethome still works if the user types it.
+        if "No home channel is set" in content:
+            logger.debug("[AgentInbox] suppressed the home-channel prompt")
+            return SendResult(success=True)
+
         # Answer as whichever identity was addressed in this thread.
         identity = self._identity_for_thread.get(chat_id, self.agent_id)
         try:
