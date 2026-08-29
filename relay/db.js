@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 
+/// Every message a person sends carries this sender id, in every account.
 export const USER_ID = "user";
 
 let db;
@@ -12,6 +13,23 @@ export function openDb(dataDir) {
   db = new Database(path.join(dataDir, "agentinbox.db"));
   db.pragma("journal_mode = WAL");
   db.exec(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      token       TEXT NOT NULL UNIQUE,
+      is_owner    INTEGER NOT NULL DEFAULT 0,
+      created_at  INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS invites (
+      code         TEXT PRIMARY KEY,
+      created_by   TEXT NOT NULL,
+      name         TEXT,
+      claimed_by   TEXT,
+      claimed_at   INTEGER,
+      created_at   INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS agents (
       id            TEXT PRIMARY KEY,
       name          TEXT NOT NULL,
@@ -87,6 +105,14 @@ export function openDb(dataDir) {
   if (!columns.includes("available_profiles")) {
     db.exec("ALTER TABLE agents ADD COLUMN available_profiles TEXT");
   }
+  // Everything belongs to an account. One relay, many people, no shared view.
+  if (!columns.includes("account_id")) {
+    db.exec("ALTER TABLE agents ADD COLUMN account_id TEXT");
+  }
+  const threadCols = db.prepare("PRAGMA table_info(threads)").all().map((c) => c.name);
+  if (!threadCols.includes("account_id")) {
+    db.exec("ALTER TABLE threads ADD COLUMN account_id TEXT");
+  }
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_connect_token ON agents (connect_token) WHERE connect_token IS NOT NULL"
   );
@@ -95,9 +121,76 @@ export function openDb(dataDir) {
 
 export const now = () => Date.now();
 
+/* ---------- accounts ---------- */
+
+export function createAccount({ id, name, token, is_owner = 0 }) {
+  db.prepare(
+    "INSERT INTO accounts (id, name, token, is_owner, created_at) VALUES (?, ?, ?, ?, ?)"
+  ).run(id, name, token, is_owner ? 1 : 0, now());
+  return getAccount(id);
+}
+
+export function getAccount(id) {
+  return db.prepare("SELECT * FROM accounts WHERE id = ?").get(id);
+}
+
+export function getAccountByToken(token) {
+  if (!token) return null;
+  return db.prepare("SELECT * FROM accounts WHERE token = ?").get(token);
+}
+
+/** Give pre-accounts rows to the owner, so upgrading loses nothing. */
+export function adoptOrphans(accountId) {
+  const agents = db
+    .prepare("UPDATE agents SET account_id = ? WHERE account_id IS NULL")
+    .run(accountId).changes;
+  const threads = db
+    .prepare("UPDATE threads SET account_id = ? WHERE account_id IS NULL")
+    .run(accountId).changes;
+  return { agents, threads };
+}
+
+export function retokenAccount(id, token) {
+  db.prepare("UPDATE accounts SET token = ? WHERE id = ?").run(token, id);
+}
+
+export function listAccounts() {
+  return db.prepare("SELECT * FROM accounts ORDER BY created_at").all();
+}
+
+export function ownerAccount() {
+  return db.prepare("SELECT * FROM accounts WHERE is_owner = 1").get();
+}
+
+/* ---------- invites ---------- */
+
+export function createInvite({ code, created_by, name = null }) {
+  db.prepare(
+    "INSERT INTO invites (code, created_by, name, created_at) VALUES (?, ?, ?, ?)"
+  ).run(code, created_by, name, now());
+  return getInvite(code);
+}
+
+export function getInvite(code) {
+  return db.prepare("SELECT * FROM invites WHERE code = ?").get(code);
+}
+
+export function claimInvite(code, accountId) {
+  db.prepare(
+    "UPDATE invites SET claimed_by = ?, claimed_at = ? WHERE code = ? AND claimed_by IS NULL"
+  ).run(accountId, now(), code);
+  return getInvite(code);
+}
+
+export function listInvites(createdBy) {
+  return db
+    .prepare("SELECT * FROM invites WHERE created_by = ? ORDER BY created_at DESC")
+    .all(createdBy);
+}
+
 /* ---------- agents ---------- */
 
-export function upsertAgent({ id, name, avatar_emoji }) {
+export function upsertAgent({ id, name, avatar_emoji, account_id = null }) {
   const existing = db.prepare("SELECT * FROM agents WHERE id = ?").get(id);
   if (existing) {
     db.prepare(
@@ -105,9 +198,9 @@ export function upsertAgent({ id, name, avatar_emoji }) {
     ).run(name ?? existing.name, avatar_emoji ?? existing.avatar_emoji, id);
   } else {
     db.prepare(
-      `INSERT INTO agents (id, name, avatar_emoji, status, last_seen)
-       VALUES (?, ?, ?, 'offline', 0)`
-    ).run(id, name ?? id, avatar_emoji ?? "🤖");
+      `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, account_id)
+       VALUES (?, ?, ?, 'offline', 0, ?)`
+    ).run(id, name ?? id, avatar_emoji ?? "🤖", account_id);
   }
   return getAgent(id);
 }
@@ -126,8 +219,11 @@ export function getAgent(id) {
   return hydrateAgent(db.prepare("SELECT * FROM agents WHERE id = ?").get(id));
 }
 
-export function listAgents() {
-  return db.prepare("SELECT * FROM agents ORDER BY name").all().map(hydrateAgent);
+export function listAgents(accountId) {
+  return db
+    .prepare("SELECT * FROM agents WHERE account_id = ? ORDER BY name")
+    .all(accountId)
+    .map(hydrateAgent);
 }
 
 export function createAgentWithToken({
@@ -137,11 +233,12 @@ export function createAgentWithToken({
   connect_token,
   host_id = null,
   profile = null,
+  account_id,
 }) {
   db.prepare(
-    `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, connect_token, host_id, profile)
-     VALUES (?, ?, ?, 'offline', 0, ?, ?, ?)`
-  ).run(id, name, avatar_emoji, connect_token, host_id, profile);
+    `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, connect_token, host_id, profile, account_id)
+     VALUES (?, ?, ?, 'offline', 0, ?, ?, ?, ?)`
+  ).run(id, name, avatar_emoji, connect_token, host_id, profile, account_id);
   return getAgent(id);
 }
 
@@ -210,11 +307,11 @@ export function touchAgentSeen(id, at) {
 
 /* ---------- threads ---------- */
 
-export function createThread({ id, kind, name, participant_ids }) {
+export function createThread({ id, kind, name, participant_ids, account_id }) {
   const t = { id, kind, name: name ?? null, created_at: now() };
   db.prepare(
-    "INSERT INTO threads (id, kind, name, created_at) VALUES (?, ?, ?, ?)"
-  ).run(t.id, t.kind, t.name, t.created_at);
+    "INSERT INTO threads (id, kind, name, created_at, account_id) VALUES (?, ?, ?, ?, ?)"
+  ).run(t.id, t.kind, t.name, t.created_at, account_id);
   const add = db.prepare(
     "INSERT OR IGNORE INTO thread_participants (thread_id, participant_id) VALUES (?, ?)"
   );
@@ -237,11 +334,15 @@ export function participantIds(threadId) {
     .map((r) => r.participant_id);
 }
 
-export function listThreads() {
+export function listThreads(accountId) {
   return db
-    .prepare("SELECT * FROM threads")
-    .all()
+    .prepare("SELECT * FROM threads WHERE account_id = ?")
+    .all(accountId)
     .map((t) => ({ ...t, participant_ids: participantIds(t.id) }));
+}
+
+export function accountOfAgent(agentId) {
+  return getAgent(agentId)?.account_id ?? null;
 }
 
 export function threadsForParticipant(participantId) {

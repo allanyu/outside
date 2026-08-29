@@ -8,6 +8,8 @@ struct SetupView: View {
 
     @State private var url: String = ""
     @State private var token: String = ""
+    @State private var inviteCode: String = ""
+    @State private var joining = false
 
     private var canConnect: Bool {
         !url.trimmingCharacters(in: .whitespaces).isEmpty
@@ -17,6 +19,35 @@ struct SetupView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if isFirstRun {
+                    Section {
+                        TextField("http://192.168.1.20:8787", text: $url)
+                            .textContentType(.URL)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        TextField("Invite code", text: $inviteCode)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                        Button(joining ? "Joining…" : "Join") {
+                            joining = true
+                            Task {
+                                await store.join(relayURL: url, code: inviteCode)
+                                joining = false
+                            }
+                        }
+                        .disabled(url.isEmpty || inviteCode.isEmpty || joining)
+                    } header: {
+                        Text("Have an invite?")
+                    } footer: {
+                        Text("Tapping the invite link fills this in for you. You get your own agents and threads — nobody else's.")
+                    }
+
+                    if let joinError = store.joinError {
+                        Section { Text(joinError).font(.footnote).foregroundStyle(.red) }
+                    }
+                }
+
                 Section {
                     TextField("http://192.168.1.20:8787", text: $url)
                         .textContentType(.URL)
@@ -27,7 +58,7 @@ struct SetupView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 } header: {
-                    Text("Relay")
+                    Text(isFirstRun ? "Or connect with a token" : "Relay")
                 } footer: {
                     Text("The relay prints both lines when it starts.")
                 }
@@ -43,6 +74,9 @@ struct SetupView: View {
 
                 if !isFirstRun {
                     Section {
+                        if let account = store.account {
+                            LabeledContent("Signed in as", value: account.name)
+                        }
                         ConnectionRow()
                         Button("Disconnect", role: .destructive) {
                             store.signOut()

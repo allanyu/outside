@@ -6,6 +6,7 @@ struct InboxView: View {
     @State private var showingSettings = false
     @State private var showingNewGroup = false
     @State private var showingNewAgent = false
+    @State private var showingInvite = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -53,6 +54,12 @@ struct InboxView: View {
                             Label("New Group", systemImage: "person.2.badge.plus")
                         }
                         .disabled(store.agents.isEmpty)
+                        Divider()
+                        Button {
+                            showingInvite = true
+                        } label: {
+                            Label("Invite someone", systemImage: "person.crop.circle.badge.plus")
+                        }
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -66,6 +73,7 @@ struct InboxView: View {
             .sheet(isPresented: $showingSettings) { SetupView() }
             .sheet(isPresented: $showingNewGroup) { NewGroupView() }
             .sheet(isPresented: $showingNewAgent) { NewAgentView() }
+            .sheet(isPresented: $showingInvite) { InviteView() }
         }
     }
 

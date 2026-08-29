@@ -10,6 +10,7 @@
 		0A024E31CC62363D7D21B62A /* RelayStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E51B677C02B7214828261ED /* RelayStore.swift */; };
 		16A089BAC1D08DABCDD9A006 /* Composer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD5C962D52184334A18D0E5 /* Composer.swift */; };
 		29F9801CAEE806433A350CF5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 04E9505D61CD86B7B292BF96 /* Assets.xcassets */; };
+		2B87C244C0EE81EF7EA2DD58 /* InviteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B960D10E9692F8A5A19E45A3 /* InviteView.swift */; };
 		3DC2882DFA5F5F3710F6C87C /* AgentInboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */; };
 		3FB5A43CE142751669D232D9 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9386E40AD6E745250BE7A74D /* SetupView.swift */; };
 		500E3DB97D21E7ED942C7A4E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C91834E5F6BD5CE338B154 /* Models.swift */; };
@@ -39,6 +40,7 @@
 		958DF83306E00918BCC44AF3 /* AgentInbox.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AgentInbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A171D822BA125D3D25E2160A /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
 		B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInboxApp.swift; sourceTree = "<group>"; };
+		B960D10E9692F8A5A19E45A3 /* InviteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteView.swift; sourceTree = "<group>"; };
 		BCB2D4998FFEB87A8A3DA0F9 /* NewGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGroupView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -80,6 +82,7 @@
 				1EB4896D91023D800165B625 /* ApprovalCard.swift */,
 				0BD5C962D52184334A18D0E5 /* Composer.swift */,
 				949F491DFCCCD797044CD8B5 /* InboxView.swift */,
+				B960D10E9692F8A5A19E45A3 /* InviteView.swift */,
 				A171D822BA125D3D25E2160A /* MessageRow.swift */,
 				2CE0B5D4C3D4926BB000CAC1 /* NewAgentView.swift */,
 				BCB2D4998FFEB87A8A3DA0F9 /* NewGroupView.swift */,
@@ -166,6 +169,7 @@
 				83D8E8E6F602740A9EA60FE1 /* ApprovalCard.swift in Sources */,
 				16A089BAC1D08DABCDD9A006 /* Composer.swift in Sources */,
 				7C56541BC4EA9D15751B23E2 /* InboxView.swift in Sources */,
+				2B87C244C0EE81EF7EA2DD58 /* InviteView.swift in Sources */,
 				BA34C40806ABF294F8CD4671 /* MessageRow.swift in Sources */,
 				500E3DB97D21E7ED942C7A4E /* Models.swift in Sources */,
 				C2F133711263D0C57AEFDF8F /* NewAgentView.swift in Sources */,

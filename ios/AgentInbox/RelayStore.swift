@@ -40,6 +40,11 @@ final class RelayStore {
     /// Set when the relay confirms a newly minted agent, so the sheet can push
     /// straight to its connect instructions.
     var justMinted: Agent?
+    /// Who this device is signed in as.
+    var account: Account?
+    /// The most recent invite this account created.
+    var lastInvite: Invite?
+    var joinError: String?
 
     private var task: URLSessionWebSocketTask?
     private var readTask: Task<Void, Never>?
@@ -58,6 +63,8 @@ final class RelayStore {
     func signOut() {
         disconnect()
         save(relayURL: "", token: "")
+        account = nil
+        lastInvite = nil
         agents = []
         threads = []
         approvals = []
@@ -65,16 +72,69 @@ final class RelayStore {
         connection = .idle
     }
 
-    /// agentinbox://connect?url=http://10.0.0.2:8787&token=dev-token
+    /// Two links open the app:
+    ///   agentinbox://connect?url=…&token=…   an existing account, on a new device
+    ///   agentinbox://join?url=…&code=…       an invite: makes a new account
     func handle(url: URL) {
-        guard url.scheme == "agentinbox", url.host == "connect",
+        guard url.scheme == "agentinbox",
               let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
         else { return }
         let relay = items.first { $0.name == "url" }?.value ?? ""
-        let tok = items.first { $0.name == "token" }?.value ?? ""
-        guard !relay.isEmpty, !tok.isEmpty else { return }
-        save(relayURL: relay, token: tok)
-        connect()
+
+        switch url.host {
+        case "connect":
+            let tok = items.first { $0.name == "token" }?.value ?? ""
+            guard !relay.isEmpty, !tok.isEmpty else { return }
+            save(relayURL: relay, token: tok)
+            connect()
+        case "join":
+            let code = items.first { $0.name == "code" }?.value ?? ""
+            guard !relay.isEmpty, !code.isEmpty else { return }
+            Task { await join(relayURL: relay, code: code) }
+        default:
+            break
+        }
+    }
+
+    /// Redeem an invite. The relay creates a fresh account and hands back its
+    /// token, so a tester never sees anyone else's threads.
+    func join(relayURL: String, code: String, displayName: String = "") async {
+        joinError = nil
+        let base = relayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var comps = URLComponents(string: base) else {
+            joinError = "That relay address doesn't look right."
+            return
+        }
+        comps.path = "/api/join"
+        guard let url = comps.url else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "code": code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
+            "name": displayName,
+        ])
+        do {
+            let (body, response) = try await session.data(for: request)
+            struct JoinResponse: Decodable { let token: String }
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                struct ErrorResponse: Decodable { let error: String }
+                joinError = (try? Self.decoder.decode(ErrorResponse.self, from: body))?.error
+                    ?? "That invite didn't work."
+                return
+            }
+            let joined = try Self.decoder.decode(JoinResponse.self, from: body)
+            save(relayURL: base, token: joined.token)
+            connect()
+        } catch {
+            joinError = error.localizedDescription
+        }
+    }
+
+    func createInvite(name: String) {
+        lastInvite = nil
+        send(["type": "create_invite", "name": name])
     }
 
     var baseURL: URL? { URL(string: relayURL) }
@@ -164,7 +224,9 @@ final class RelayStore {
         let threads: [ChatThread]
         let approvals: [Approval]
         let relayUrl: String?
+        let account: Account?
     }
+    private struct InviteEvent: Decodable { let invite: Invite; let relayUrl: String? }
     private struct MintedEvent: Decodable { let agent: Agent; let relayUrl: String? }
     private struct AgentRemovedEvent: Decodable { let agentId: String; let threadIds: [String] }
     private struct MessageEvent: Decodable { let message: Message }
@@ -189,6 +251,7 @@ final class RelayStore {
             approvals = e.approvals
             statusLines = [:]
             agentFacingURL = e.relayUrl ?? relayURL
+            account = e.account
 
         case "message":
             guard let e = decode(MessageEvent.self, data) else { return }
@@ -233,6 +296,11 @@ final class RelayStore {
             } else {
                 approvals.append(e.approval)
             }
+
+        case "invite":
+            guard let e = decode(InviteEvent.self, data) else { return }
+            if let url = e.relayUrl { agentFacingURL = url }
+            lastInvite = e.invite
 
         case "agent_minted":
             guard let e = decode(MintedEvent.self, data) else { return }
@@ -343,6 +411,15 @@ final class RelayStore {
 
     func deleteAgent(_ agentId: String) {
         send(["type": "delete_agent", "agent_id": agentId])
+    }
+
+    /// The link that puts an invited person straight into their own account.
+    func inviteLink(_ invite: Invite) -> String {
+        let base = agentFacingURL.isEmpty ? relayURL : agentFacingURL
+        let encoded = base.addingPercentEncoding(
+            withAllowedCharacters: .alphanumerics
+        ) ?? base
+        return "agentinbox://join?url=\(encoded)&code=\(invite.code)"
     }
 
     /// The line to run on the machine where Hermes lives.

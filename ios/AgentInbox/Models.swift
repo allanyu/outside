@@ -78,6 +78,21 @@ struct Approval: Codable, Identifiable, Hashable {
     var isDecided: Bool { decision != nil }
 }
 
+struct Account: Codable, Identifiable, Hashable {
+    let id: String
+    var name: String
+    var isOwner: Bool
+}
+
+struct Invite: Codable, Identifiable, Hashable {
+    var id: String { code }
+    let code: String
+    var name: String?
+    var claimedBy: String?
+
+    var isClaimed: Bool { !(claimedBy ?? "").isEmpty }
+}
+
 /// An "agent is working on it" line. Never stored, replaced by the real message.
 struct StatusLine: Hashable {
     let agentId: String

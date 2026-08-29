@@ -20,21 +20,48 @@ const FILES_DIR = path.join(DATA_DIR, "files");
 db.openDb(DATA_DIR);
 
 const uid = () => crypto.randomUUID();
+const secret = (prefix) => `${prefix}_${crypto.randomBytes(18).toString("base64url")}`;
+
+/**
+ * The relay serves several people. Each has an account holding their own
+ * agents and threads; RELAY_TOKEN belongs to the first one and doubles as the
+ * bootstrap for a fresh install.
+ */
+function ownerAccount() {
+  let owner = db.ownerAccount();
+  if (!owner) {
+    owner = db.createAccount({
+      id: uid(),
+      name: "Owner",
+      token: TOKEN,
+      is_owner: 1,
+    });
+    log(`created the owner account`);
+  } else if (owner.token !== TOKEN) {
+    // RELAY_TOKEN was rotated in .env — follow it.
+    db.retokenAccount(owner.id, TOKEN);
+    owner = db.getAccount(owner.id);
+  }
+  return owner;
+}
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 /* ------------------------------------------------------------------ *
  * connections
  * ------------------------------------------------------------------ */
 
-const appSockets = new Set();          // ws
+const appSockets = new Set();          // ws, each tagged with .accountId
 const agentSockets = new Map();        // agent_id -> ws
 
 function sendJson(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
 }
 
-function toApp(obj) {
-  for (const ws of appSockets) sendJson(ws, obj);
+/** Broadcast to every device signed in to one account, and only that account. */
+function toApp(accountId, obj) {
+  for (const ws of appSockets) {
+    if (ws.accountId === accountId) sendJson(ws, obj);
+  }
 }
 
 function toAgent(agentId, obj) {
@@ -68,11 +95,11 @@ function slugify(name) {
  * The name doubles as the @handle that mention routing matches on, so it has
  * to be unique -- two agents called "hermes" would both answer to @hermes.
  */
-function mintAgent({ name, avatar_emoji, host_agent_id = null, profile = null }) {
+function mintAgent({ name, avatar_emoji, host_agent_id = null, profile = null, account_id }) {
   const base = slugify(name);
   const taken = (handle) =>
     db.getAgent(handle) ||
-    db.listAgents().some((a) => a.name.toLowerCase() === handle);
+    db.listAgents(account_id).some((a) => a.name.toLowerCase() === handle);
 
   let handle = base;
   for (let n = 2; taken(handle); n++) handle = `${base}-${n}`;
@@ -81,6 +108,7 @@ function mintAgent({ name, avatar_emoji, host_agent_id = null, profile = null })
   // token of its own and nothing has to be configured where that agent runs.
   const host = host_agent_id ? db.getAgent(host_agent_id) : null;
   if (host_agent_id && !host) throw new Error("no such host agent");
+  if (host && host.account_id !== account_id) throw new Error("no such host agent");
   if (host?.host_id) throw new Error("cannot host from a hosted agent");
 
   const agent = db.createAgentWithToken({
@@ -90,10 +118,13 @@ function mintAgent({ name, avatar_emoji, host_agent_id = null, profile = null })
     connect_token: host ? null : mintToken(),
     host_id: host?.id ?? null,
     profile: host ? profile : null,
+    account_id,
   });
 
   const { thread, created } = ensureDm(handle);
-  if (created) toApp({ type: "thread", thread: threadPayload(thread.id) });
+  if (created) {
+    toApp(account_id, { type: "thread", thread: threadPayload(thread.id) });
+  }
 
   // The host is already connected, so the new agent is live immediately.
   if (host && agentSockets.has(host.id)) {
@@ -106,7 +137,7 @@ function mintAgent({ name, avatar_emoji, host_agent_id = null, profile = null })
   }
 
   const final = db.getAgent(agent.id);
-  toApp({ type: "agent_status", agent: final });
+  toApp(account_id, { type: "agent_status", agent: final });
   return final;
 }
 
@@ -119,13 +150,14 @@ function ensureDm(agentId) {
     kind: "dm",
     name: agent?.name ?? agentId,
     participant_ids: [USER_ID, agentId],
+    account_id: agent?.account_id ?? null,
   });
   return { thread, created: true };
 }
 
 // "@alpha please ask @beta" -> [agentId...] for names/ids that exist
-function parseMentions(text) {
-  const agents = db.listAgents();
+function parseMentions(text, accountId) {
+  const agents = db.listAgents(accountId);
   const found = new Set();
   for (const m of String(text || "").matchAll(/@([\w.\-]+)/g)) {
     const tag = m[1].toLowerCase();
@@ -136,6 +168,10 @@ function parseMentions(text) {
     }
   }
   return [...found];
+}
+
+function accountOfThread(threadId) {
+  return db.getThread(threadId)?.account_id ?? null;
 }
 
 function threadPayload(threadId) {
@@ -153,7 +189,7 @@ function deliver(message, { skipAgents = false } = {}) {
   const thread = db.getThread(message.thread_id);
   if (!thread) return;
 
-  toApp({ type: "message", message });
+  toApp(thread.account_id, { type: "message", message });
   if (skipAgents) return;
 
   const fromUser = message.sender_id === USER_ID;
@@ -191,7 +227,9 @@ function postMessage({
   reply_to = null,
   kind = "text",
 }) {
-  const resolved = mentions?.length ? mentions : parseMentions(text);
+  const resolved = mentions?.length
+    ? mentions
+    : parseMentions(text, accountOfThread(thread_id));
   return db.insertMessage({
     id: uid(),
     thread_id,
@@ -219,20 +257,54 @@ function tokenOf(req) {
 }
 
 function requireToken(req, res, next) {
-  if (tokenOf(req) !== TOKEN) return res.status(401).json({ error: "bad token" });
+  const account = db.getAccountByToken(tokenOf(req));
+  if (!account) return res.status(401).json({ error: "bad token" });
+  req.account = account;
   next();
 }
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-app.get("/api/agents", requireToken, (_req, res) =>
-  res.json({ agents: db.listAgents() })
+/**
+ * Redeem an invite. This is the only unauthenticated write: the code itself is
+ * the credential, it works once, and what it grants is a brand-new empty
+ * account rather than access to anyone else's.
+ */
+app.post("/api/join", (req, res) => {
+  const code = String(req.body?.code || "").trim().toUpperCase();
+  const name = String(req.body?.name || "").trim();
+  const invite = db.getInvite(code);
+  if (!invite) return res.status(404).json({ error: "no such invite" });
+  if (invite.claimed_by) return res.status(409).json({ error: "invite already used" });
+
+  const account = db.createAccount({
+    id: uid(),
+    name: name || invite.name || "Guest",
+    token: secret("acct"),
+  });
+  db.claimInvite(code, account.id);
+  log(`invite ${code} claimed -> account ${account.name}`);
+  res.json({
+    account: { id: account.id, name: account.name },
+    token: account.token,
+    relay_url: publicUrl(),
+  });
+});
+
+app.get("/api/agents", requireToken, (req, res) =>
+  res.json({ agents: db.listAgents(req.account.id) })
 );
 
 app.post("/api/agents/register", requireToken, (req, res) => {
   const { agent_id, name, avatar_emoji } = req.body || {};
   if (!agent_id) return res.status(400).json({ error: "agent_id required" });
-  const agent = registerAgent({ agent_id, name, avatar_emoji, online: false });
+  const agent = registerAgent({
+    agent_id,
+    name,
+    avatar_emoji,
+    online: false,
+    account_id: req.account.id,
+  });
   res.json({ agent });
 });
 
@@ -240,7 +312,13 @@ app.post("/api/agents/mint", requireToken, (req, res) => {
   const { name, avatar_emoji, host_agent_id, profile } = req.body || {};
   if (!name) return res.status(400).json({ error: "name required" });
   try {
-    const agent = mintAgent({ name, avatar_emoji, host_agent_id, profile });
+    const agent = mintAgent({
+      name,
+      avatar_emoji,
+      host_agent_id,
+      profile,
+      account_id: req.account.id,
+    });
     res.json({ agent, relay_url: publicUrl() });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -249,30 +327,42 @@ app.post("/api/agents/mint", requireToken, (req, res) => {
 
 app.delete("/api/agents/:id", requireToken, (req, res) => {
   const agent = db.getAgent(req.params.id);
-  if (!agent) return res.status(404).json({ error: "no such agent" });
+  if (!agent || agent.account_id !== req.account.id) {
+    return res.status(404).json({ error: "no such agent" });
+  }
   removeAgent(agent.id);
   res.json({ ok: true });
 });
 
-app.get("/api/threads", requireToken, (_req, res) =>
-  res.json({ threads: db.listThreads() })
+app.get("/api/threads", requireToken, (req, res) =>
+  res.json({ threads: db.listThreads(req.account.id) })
 );
 
 app.post("/api/threads", requireToken, (req, res) => {
   const { kind, name, participant_ids } = req.body || {};
-  const thread = createThreadFromApp({ kind, name, participant_ids });
+  const thread = createThreadFromApp({
+    kind,
+    name,
+    participant_ids,
+    account_id: req.account.id,
+  });
   if (!thread) return res.status(400).json({ error: "participant_ids required" });
   res.json({ thread });
 });
 
 app.get("/api/threads/:id/messages", requireToken, (req, res) => {
+  if (db.getThread(req.params.id)?.account_id !== req.account.id) {
+    return res.status(404).json({ error: "no such thread" });
+  }
   const since = req.query.since != null ? Number(req.query.since) : null;
   res.json({ messages: db.messagesForThread(req.params.id, { since }) });
 });
 
 app.post("/api/threads/:id/messages", requireToken, (req, res) => {
   const thread = db.getThread(req.params.id);
-  if (!thread) return res.status(404).json({ error: "no such thread" });
+  if (!thread || thread.account_id !== req.account.id) {
+    return res.status(404).json({ error: "no such thread" });
+  }
   const { sender_id = USER_ID, text, attachments, mentions, reply_to } =
     req.body || {};
   const message = postMessage({
@@ -316,27 +406,39 @@ app.get("/files/:id", (req, res) => {
  * shared actions
  * ------------------------------------------------------------------ */
 
-function registerAgent({ agent_id, name, avatar_emoji, online }) {
-  db.upsertAgent({ id: agent_id, name, avatar_emoji });
+function registerAgent({ agent_id, name, avatar_emoji, online, account_id }) {
+  db.upsertAgent({ id: agent_id, name, avatar_emoji, account_id });
   if (online) db.setAgentStatus(agent_id, "online");
   const agent = db.getAgent(agent_id);
   const { thread, created } = ensureDm(agent_id);
-  if (created) toApp({ type: "thread", thread: threadPayload(thread.id) });
-  toApp({ type: "agent_status", agent });
+  if (created) {
+    toApp(agent.account_id, { type: "thread", thread: threadPayload(thread.id) });
+  }
+  toApp(agent.account_id, { type: "agent_status", agent });
   return agent;
 }
 
 function removeAgent(agentId) {
+  const accountId = db.getAgent(agentId)?.account_id ?? null;
   agentSockets.get(agentId)?.close();
   agentSockets.delete(agentId);
   const removedThreads = db.deleteAgent(agentId);
-  toApp({ type: "agent_removed", agent_id: agentId, thread_ids: removedThreads });
+  toApp(accountId, {
+    type: "agent_removed",
+    agent_id: agentId,
+    thread_ids: removedThreads,
+  });
   log(`agent removed: ${agentId}`);
 }
 
-function createThreadFromApp({ kind, name, participant_ids }) {
+function createThreadFromApp({ kind, name, participant_ids, account_id }) {
   if (!Array.isArray(participant_ids) || participant_ids.length === 0) return null;
   const ids = [...new Set([USER_ID, ...participant_ids])];
+  // Only agents in this account may be put in a thread.
+  for (const pid of ids) {
+    if (pid === USER_ID) continue;
+    if (db.getAgent(pid)?.account_id !== account_id) return null;
+  }
   const resolvedKind = kind || (ids.length === 2 ? "dm" : "group");
   if (resolvedKind === "dm") {
     const agentId = ids.find((i) => i !== USER_ID);
@@ -348,8 +450,9 @@ function createThreadFromApp({ kind, name, participant_ids }) {
     kind: resolvedKind,
     name: name || null,
     participant_ids: ids,
+    account_id,
   });
-  toApp({ type: "thread", thread: threadPayload(thread.id) });
+  toApp(account_id, { type: "thread", thread: threadPayload(thread.id) });
   for (const pid of ids) {
     if (pid === USER_ID) continue;
     toAgent(pid, { type: "thread", thread });
@@ -374,15 +477,23 @@ server.on("upgrade", (req, socket, head) => {
   };
 
   if (url.pathname === "/ws/app") {
-    if (token !== TOKEN) return reject();
-    appWss.handleUpgrade(req, socket, head, (ws) => appWss.emit("connection", ws));
+    const account = db.getAccountByToken(token);
+    if (!account) return reject();
+    appWss.handleUpgrade(req, socket, head, (ws) => {
+      ws.accountId = account.id;
+      appWss.emit("connection", ws);
+    });
   } else if (url.pathname === "/ws/agent") {
     // Either the shared relay token, or an agent's own connect token — in
     // which case the agent's identity comes from the token, not from register.
-    const bound = token === TOKEN ? null : db.getAgentByConnectToken(token);
-    if (token !== TOKEN && !bound) return reject();
+    const owner = db.getAccountByToken(token);
+    const bound = owner ? null : db.getAgentByConnectToken(token);
+    if (!owner && !bound) return reject();
     agentWss.handleUpgrade(req, socket, head, (ws) => {
       ws.boundAgentId = bound?.id ?? null;
+      // A connect token carries its agent's account; the shared token carries
+      // the account it belongs to.
+      ws.accountId = bound?.account_id ?? owner?.id ?? null;
       agentWss.emit("connection", ws);
     });
   } else {
@@ -395,16 +506,22 @@ server.on("upgrade", (req, socket, head) => {
 
 appWss.on("connection", (ws) => {
   appSockets.add(ws);
-  log(`app connected (${appSockets.size})`);
+  const account = db.getAccount(ws.accountId);
+  log(`app connected: ${account?.name ?? "?"} (${appSockets.size} total)`);
 
+  const threads = db.listThreads(ws.accountId);
+  const threadIds = new Set(threads.map((t) => t.id));
   sendJson(ws, {
     type: "snapshot",
     user_id: USER_ID,
     relay_url: publicUrl(),
     loop_guard: LOOP_GUARD,
-    agents: db.listAgents(),
-    threads: db.listThreads().map((t) => threadPayload(t.id)),
-    approvals: db.listApprovals(),
+    account: account
+      ? { id: account.id, name: account.name, is_owner: !!account.is_owner }
+      : null,
+    agents: db.listAgents(ws.accountId),
+    threads: threads.map((t) => threadPayload(t.id)),
+    approvals: db.listApprovals().filter((a) => threadIds.has(a.thread_id)),
   });
 
   ws.on("message", (raw) => {
@@ -429,9 +546,12 @@ appWss.on("connection", (ws) => {
 });
 
 function handleAppMessage(ws, msg) {
+  const accountId = ws.accountId;
+  const ownsThread = (id) => db.getThread(id)?.account_id === accountId;
+
   switch (msg.type) {
     case "send": {
-      if (!db.getThread(msg.thread_id)) throw new Error("no such thread");
+      if (!ownsThread(msg.thread_id)) throw new Error("no such thread");
       const message = postMessage({
         thread_id: msg.thread_id,
         sender_id: USER_ID,
@@ -444,13 +564,17 @@ function handleAppMessage(ws, msg) {
       break;
     }
     case "create_thread": {
-      createThreadFromApp(msg);
+      createThreadFromApp({ ...msg, account_id: accountId });
       break;
     }
     case "decide": {
+      const existing = db.getApproval(msg.approval_id);
+      if (!existing || !ownsThread(existing.thread_id)) {
+        throw new Error("no such approval");
+      }
       const approval = db.decideApproval(msg.approval_id, msg.decision);
       if (!approval) throw new Error("no such approval");
-      toApp({ type: "approval", approval });
+      toApp(accountId, { type: "approval", approval });
       toAgent(approval.agent_id, {
         type: "decision",
         approval_id: approval.id,
@@ -466,13 +590,29 @@ function handleAppMessage(ws, msg) {
         avatar_emoji: msg.avatar_emoji,
         host_agent_id: msg.host_agent_id ?? null,
         profile: msg.profile ?? null,
+        account_id: accountId,
       });
       sendJson(ws, { type: "agent_minted", agent, relay_url: publicUrl() });
       break;
     }
     case "delete_agent": {
-      if (!db.getAgent(msg.agent_id)) throw new Error("no such agent");
+      if (db.getAgent(msg.agent_id)?.account_id !== accountId) {
+        throw new Error("no such agent");
+      }
       removeAgent(msg.agent_id);
+      break;
+    }
+
+    // Invite someone else onto this relay. They get their own account: their
+    // own agents, their own threads, no sight of yours.
+    case "create_invite": {
+      const code = crypto.randomBytes(4).toString("hex").toUpperCase();
+      const invite = db.createInvite({
+        code,
+        created_by: accountId,
+        name: msg.name ?? null,
+      });
+      sendJson(ws, { type: "invite", invite, relay_url: publicUrl() });
       break;
     }
     case "ping":
@@ -509,7 +649,8 @@ agentWss.on("connection", (ws) => {
       agentSockets.delete(ws.agentId);
       for (const id of [ws.agentId, ...db.agentsHostedBy(ws.agentId).map((a) => a.id)]) {
         db.setAgentStatus(id, "offline");
-        toApp({ type: "agent_status", agent: db.getAgent(id) });
+        const a = db.getAgent(id);
+        toApp(a?.account_id, { type: "agent_status", agent: a });
       }
       log(`agent offline: ${ws.agentId}`);
     }
@@ -538,6 +679,7 @@ function handleAgentMessage(ws, msg) {
       name: msg.name,
       avatar_emoji: msg.avatar_emoji,
       online: true,
+      account_id: ws.accountId,
     });
     log(`agent online: ${id} (${agent.name})`);
 
@@ -545,7 +687,7 @@ function handleAgentMessage(ws, msg) {
     const hosted = db.agentsHostedBy(id);
     for (const h of hosted) {
       db.setAgentStatus(h.id, "online");
-      toApp({ type: "agent_status", agent: db.getAgent(h.id) });
+      toApp(h.account_id, { type: "agent_status", agent: db.getAgent(h.id) });
     }
 
     const threads = db.threadsForParticipant(id);
@@ -612,7 +754,7 @@ function handleAgentMessage(ws, msg) {
 
     // Ephemeral: shown in the app until a real message lands, never stored.
     case "status": {
-      toApp({
+      toApp(accountOfThread(msg.thread_id), {
         type: "status",
         thread_id: msg.thread_id,
         agent_id: agentId,
@@ -635,13 +777,13 @@ function handleAgentMessage(ws, msg) {
           kind: "text",
           created_at: db.now(),
         });
-        toApp({ type: "message", message });
+        toApp(accountOfThread(message.thread_id), { type: "message", message });
       }
       const updated = db.updateMessageText(
         message.id,
         message.text + (msg.delta ?? "")
       );
-      toApp({
+      toApp(accountOfThread(updated.thread_id), {
         type: "stream",
         thread_id: updated.thread_id,
         message_id: updated.id,
@@ -658,7 +800,7 @@ function handleAgentMessage(ws, msg) {
       const final = mentions.length
         ? db.updateMessageMentions(message.id, mentions)
         : message;
-      toApp({ type: "stream_end", message: final });
+      toApp(accountOfThread(final.thread_id), { type: "stream_end", message: final });
       deliver(final);
       break;
     }
@@ -681,8 +823,9 @@ function handleAgentMessage(ws, msg) {
         options: msg.options ?? ["Approve", "Deny"],
         created_at: db.now(),
       });
-      toApp({ type: "message", message });
-      toApp({ type: "approval", approval });
+      const approvalAccount = accountOfThread(msg.thread_id);
+      toApp(approvalAccount, { type: "message", message });
+      toApp(approvalAccount, { type: "approval", approval });
       sendJson(ws, { type: "approval_created", approval });
       break;
     }
@@ -710,8 +853,18 @@ function lanAddress() {
   return "127.0.0.1";
 }
 
+const owner = ownerAccount();
+{
+  const adopted = db.adoptOrphans(owner.id);
+  if (adopted.agents || adopted.threads) {
+    log(
+      `adopted ${adopted.agents} agent(s) and ${adopted.threads} thread(s) from before accounts existed`
+    );
+  }
+}
+
 // Any agent left marked online by a previous run is not online now.
-for (const a of db.listAgents()) {
+for (const a of db.listAgents(owner.id)) {
   if (a.status === "online") db.setAgentStatus(a.id, "offline", a.last_seen);
 }
 
@@ -725,6 +878,7 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`  token     ${TOKEN}`);
   console.log(`  data      ${DATA_DIR}`);
   console.log(`  loopguard ${LOOP_GUARD}`);
+  console.log(`  accounts  ${db.listAccounts().length}`);
   console.log("");
   console.log(
     `  agentinbox://connect?url=${encodeURIComponent(url)}&token=${encodeURIComponent(TOKEN)}`
