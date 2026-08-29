@@ -45,6 +45,51 @@ function toAgent(agentId, obj) {
  * helpers
  * ------------------------------------------------------------------ */
 
+// Readable, typeable token: no 0/O/1/I.
+const TOKEN_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+
+function mintToken() {
+  const bytes = crypto.randomBytes(14);
+  let out = "";
+  for (const b of bytes) out += TOKEN_ALPHABET[b % TOKEN_ALPHABET.length];
+  return `ai_${out}`;
+}
+
+function slugify(name) {
+  const slug = String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return slug || "agent";
+}
+
+/**
+ * Creates an offline agent with its own connect token, ready to be handed out.
+ * The name doubles as the @handle that mention routing matches on, so it has
+ * to be unique -- two agents called "hermes" would both answer to @hermes.
+ */
+function mintAgent({ name, avatar_emoji }) {
+  const base = slugify(name);
+  const taken = (handle) =>
+    db.getAgent(handle) ||
+    db.listAgents().some((a) => a.name.toLowerCase() === handle);
+
+  let handle = base;
+  for (let n = 2; taken(handle); n++) handle = `${base}-${n}`;
+
+  const agent = db.createAgentWithToken({
+    id: handle,
+    name: handle,
+    avatar_emoji: avatar_emoji?.trim() || "🤖",
+    connect_token: mintToken(),
+  });
+
+  const { thread, created } = ensureDm(handle);
+  if (created) toApp({ type: "thread", thread: threadPayload(thread.id) });
+  toApp({ type: "agent_status", agent });
+  return agent;
+}
+
 function ensureDm(agentId) {
   const existing = db.findDm(agentId);
   if (existing) return { thread: existing, created: false };
@@ -167,6 +212,20 @@ app.post("/api/agents/register", requireToken, (req, res) => {
   res.json({ agent });
 });
 
+app.post("/api/agents/mint", requireToken, (req, res) => {
+  const { name, avatar_emoji } = req.body || {};
+  if (!name) return res.status(400).json({ error: "name required" });
+  const agent = mintAgent({ name, avatar_emoji });
+  res.json({ agent, relay_url: publicUrl() });
+});
+
+app.delete("/api/agents/:id", requireToken, (req, res) => {
+  const agent = db.getAgent(req.params.id);
+  if (!agent) return res.status(404).json({ error: "no such agent" });
+  removeAgent(agent.id);
+  res.json({ ok: true });
+});
+
 app.get("/api/threads", requireToken, (_req, res) =>
   res.json({ threads: db.listThreads() })
 );
@@ -239,6 +298,14 @@ function registerAgent({ agent_id, name, avatar_emoji, online }) {
   return agent;
 }
 
+function removeAgent(agentId) {
+  agentSockets.get(agentId)?.close();
+  agentSockets.delete(agentId);
+  const removedThreads = db.deleteAgent(agentId);
+  toApp({ type: "agent_removed", agent_id: agentId, thread_ids: removedThreads });
+  log(`agent removed: ${agentId}`);
+}
+
 function createThreadFromApp({ kind, name, participant_ids }) {
   if (!Array.isArray(participant_ids) || participant_ids.length === 0) return null;
   const ids = [...new Set([USER_ID, ...participant_ids])];
@@ -272,17 +339,24 @@ const agentWss = new WebSocketServer({ noServer: true });
 
 server.on("upgrade", (req, socket, head) => {
   const url = new URL(req.url, "http://localhost");
-  if (url.searchParams.get("token") !== TOKEN) {
+  const token = url.searchParams.get("token");
+  const reject = () => {
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
     socket.destroy();
-    return;
-  }
+  };
+
   if (url.pathname === "/ws/app") {
+    if (token !== TOKEN) return reject();
     appWss.handleUpgrade(req, socket, head, (ws) => appWss.emit("connection", ws));
   } else if (url.pathname === "/ws/agent") {
-    agentWss.handleUpgrade(req, socket, head, (ws) =>
-      agentWss.emit("connection", ws)
-    );
+    // Either the shared relay token, or an agent's own connect token — in
+    // which case the agent's identity comes from the token, not from register.
+    const bound = token === TOKEN ? null : db.getAgentByConnectToken(token);
+    if (token !== TOKEN && !bound) return reject();
+    agentWss.handleUpgrade(req, socket, head, (ws) => {
+      ws.boundAgentId = bound?.id ?? null;
+      agentWss.emit("connection", ws);
+    });
   } else {
     socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
     socket.destroy();
@@ -298,6 +372,7 @@ appWss.on("connection", (ws) => {
   sendJson(ws, {
     type: "snapshot",
     user_id: USER_ID,
+    relay_url: publicUrl(),
     loop_guard: LOOP_GUARD,
     agents: db.listAgents(),
     threads: db.listThreads().map((t) => threadPayload(t.id)),
@@ -356,6 +431,17 @@ function handleAppMessage(ws, msg) {
       });
       break;
     }
+    case "mint_agent": {
+      if (!msg.name) throw new Error("name required");
+      const agent = mintAgent(msg);
+      sendJson(ws, { type: "agent_minted", agent, relay_url: publicUrl() });
+      break;
+    }
+    case "delete_agent": {
+      if (!db.getAgent(msg.agent_id)) throw new Error("no such agent");
+      removeAgent(msg.agent_id);
+      break;
+    }
     case "ping":
       sendJson(ws, { type: "pong" });
       break;
@@ -397,8 +483,12 @@ agentWss.on("connection", (ws) => {
 
 function handleAgentMessage(ws, msg) {
   if (msg.type === "register") {
-    const id = msg.agent_id;
+    // A connect token names the agent, so register does not have to.
+    const id = ws.boundAgentId ?? msg.agent_id;
     if (!id) throw new Error("agent_id required");
+    if (ws.boundAgentId && msg.agent_id && msg.agent_id !== ws.boundAgentId) {
+      throw new Error("this connect token belongs to a different agent");
+    }
     const previous = db.getAgent(id);
     const since = previous?.last_seen ?? 0;
 
@@ -539,6 +629,11 @@ function handleAgentMessage(ws, msg) {
 /* ------------------------------------------------------------------ *
  * boot
  * ------------------------------------------------------------------ */
+
+// The address to hand to an agent on another machine — never 127.0.0.1.
+function publicUrl() {
+  return process.env.PUBLIC_URL || `http://${lanAddress()}:${PORT}`;
+}
 
 function lanAddress() {
   for (const list of Object.values(os.networkInterfaces())) {

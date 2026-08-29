@@ -29,6 +29,7 @@ together with the relay.
 | `RELAY_TOKEN`     | `dev-token`             |                                            |
 | `IDLE_DM_SECONDS` | `90`                    | `0` disables the unprompted DM             |
 | `AGENT_ID`        | —                       | set it to run one agent instead of the pair |
+| `RELAY_TOKEN` = `ai_…` | —                  | a connect token from the app: runs exactly that one agent, and its name and emoji come from the relay |
 | `AGENT_NAME`      | `AGENT_ID`              | this is the `@handle`                      |
 | `AVATAR`          | `🤖`                    |                                            |
 

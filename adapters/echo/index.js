@@ -7,19 +7,23 @@ const RELAY_URL = process.env.RELAY_URL || "http://127.0.0.1:8787";
 const TOKEN = process.env.RELAY_TOKEN || "dev-token";
 const IDLE_DM_SECONDS = Number(process.env.IDLE_DM_SECONDS ?? 90);
 
-// One AGENT_ID in the env means "run just this one". Otherwise run the pair.
-const roster = process.env.AGENT_ID
-  ? [
-      {
-        id: process.env.AGENT_ID,
-        name: process.env.AGENT_NAME || process.env.AGENT_ID,
-        avatar: process.env.AVATAR || "🤖",
-      },
-    ]
-  : [
-      { id: "alpha", name: "alpha", avatar: "🅰️" },
-      { id: "beta", name: "beta", avatar: "🅱️" },
-    ];
+// A connect token from the app names exactly one agent, so run just that one.
+// Otherwise one AGENT_ID means "run this one"; with neither, run the demo pair.
+const usesConnectToken = TOKEN.startsWith("ai_");
+const roster = usesConnectToken
+  ? [{ id: null, name: "agent", avatar: "🤖" }]
+  : process.env.AGENT_ID
+    ? [
+        {
+          id: process.env.AGENT_ID,
+          name: process.env.AGENT_NAME || process.env.AGENT_ID,
+          avatar: process.env.AVATAR || "🤖",
+        },
+      ]
+    : [
+        { id: "alpha", name: "alpha", avatar: "🅰️" },
+        { id: "beta", name: "beta", avatar: "🅱️" },
+      ];
 
 let lastActivity = Date.now();
 
@@ -102,5 +106,7 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 console.log(
-  `echo adapter -> ${RELAY_URL} as ${roster.map((r) => "@" + r.name).join(", ")}`
+  usesConnectToken
+    ? `echo adapter -> ${RELAY_URL} (identity comes from the connect token)`
+    : `echo adapter -> ${RELAY_URL} as ${roster.map((r) => "@" + r.name).join(", ")}`
 );

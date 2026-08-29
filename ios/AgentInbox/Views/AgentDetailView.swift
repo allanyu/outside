@@ -2,7 +2,10 @@ import SwiftUI
 
 struct AgentDetailView: View {
     @Environment(RelayStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
     let agentId: String
+
+    @State private var confirmingRemove = false
 
     private var agent: Agent? { store.agent(agentId) }
 
@@ -24,6 +27,15 @@ struct AgentDetailView: View {
                 Section("Identity") {
                     LabeledContent("id", value: agent.id)
                 }
+                if agent.hasConnectToken {
+                    Section {
+                        NavigationLink(value: Route.connect(agent.id)) {
+                            Label("Connect instructions", systemImage: "link")
+                        }
+                    } footer: {
+                        Text("The relay URL and this agent's token, again.")
+                    }
+                }
                 Section("Threads") {
                     ForEach(store.threads(containing: agent.id)) { thread in
                         NavigationLink(value: Route.thread(thread.id)) {
@@ -38,9 +50,28 @@ struct AgentDetailView: View {
                         }
                     }
                 }
+                if agent.hasConnectToken {
+                    Section {
+                        Button("Remove Agent", role: .destructive) { confirmingRemove = true }
+                    } footer: {
+                        Text("Revokes the token and deletes its DM. Threads it shared with other agents stay.")
+                    }
+                }
             } else {
                 ContentUnavailableView("Unknown agent", systemImage: "questionmark.circle")
             }
+        }
+        .confirmationDialog(
+            "Remove @\(agent?.name ?? "")?",
+            isPresented: $confirmingRemove,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                store.deleteAgent(agentId)
+                dismiss()
+            }
+        } message: {
+            Text("Its connect token stops working. You can add it again later with a new one.")
         }
         .navigationTitle(agent?.name ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)

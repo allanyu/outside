@@ -26,7 +26,9 @@ Server → app: `snapshot` (agents, threads, last 100 messages each, approvals),
 `stream_end` while an agent streams.
 
 App → server: `send {thread_id, text, attachments?, mentions?}`,
-`create_thread {kind, name?, participant_ids}`, `decide {approval_id, decision}`.
+`create_thread {kind, name?, participant_ids}`, `decide {approval_id, decision}`,
+`mint_agent {name, avatar_emoji}` (answered with `agent_minted`), and
+`delete_agent {agent_id}` (broadcast as `agent_removed`).
 
 ### `/ws/agent`
 
@@ -38,13 +40,26 @@ online), `send {thread_id, text, reply_to?, mentions?}`,
 Server → agent: `registered {agent, threads}`, `inbound {thread, message, mentioned}`,
 `decision {approval_id, decision, thread_id}`.
 
+### Two kinds of token
+
+`RELAY_TOKEN` is the shared one: it authenticates the app, the REST API, and
+any agent that names itself on `register` (the echo adapter does this).
+
+A **connect token** is minted per agent, from the app or `POST /api/agents/mint`.
+It looks like `ai_wy68xbb8dkynux`, authenticates only `/ws/agent`, and *is* the
+agent's identity — a client holding one sends a bare `{"type":"register"}` and
+the relay fills in the id, name and emoji it already has. Removing the agent
+revokes it.
+
 ### REST
 
 `Authorization: Bearer <token>` or `?token=`.
 
 ```
-GET  /api/agents
-POST /api/agents/register        {agent_id, name, avatar_emoji}
+GET    /api/agents
+POST   /api/agents/mint          {name, avatar_emoji}  -> agent + connect_token
+DELETE /api/agents/:id           revokes its token, deletes threads it leaves empty
+POST   /api/agents/register      {agent_id, name, avatar_emoji}
 GET  /api/threads
 POST /api/threads                {kind, name?, participant_ids}
 GET  /api/threads/:id/messages?since=<ms>
@@ -68,6 +83,9 @@ GET  /health
 
 Registering an agent also creates its DM thread with the user if there isn't
 one, which is why `@alpha` and `@beta` show up in the inbox on first run.
+
+Minted names are made unique (`hermes`, then `hermes-2`). The name doubles as
+the `@handle` that rule 1 matches on, so two agents cannot share one.
 
 ## CLI
 

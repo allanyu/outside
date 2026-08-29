@@ -8,6 +8,14 @@ struct ThreadView: View {
     private var messages: [Message] { thread?.messages ?? [] }
 
     var body: some View {
+        if thread == nil {
+            ContentUnavailableView("Thread removed", systemImage: "tray")
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {

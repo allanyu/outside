@@ -5,6 +5,7 @@ struct InboxView: View {
     @State private var path: [Route] = []
     @State private var showingSettings = false
     @State private var showingNewGroup = false
+    @State private var showingNewAgent = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -13,7 +14,7 @@ struct InboxView: View {
                     ContentUnavailableView(
                         "No threads yet",
                         systemImage: "tray",
-                        description: Text("Start the echo adapter and @alpha and @beta will appear here.")
+                        description: Text("Tap + to add an agent, or start the echo adapter and @alpha and @beta appear here.")
                     )
                     .listRowSeparator(.hidden)
                 }
@@ -29,6 +30,7 @@ struct InboxView: View {
                 switch route {
                 case .thread(let id): ThreadView(threadId: id)
                 case .agent(let id): AgentDetailView(agentId: id)
+                case .connect(let id): AgentConnectView(agentId: id)
                 }
             }
             .toolbar {
@@ -39,14 +41,43 @@ struct InboxView: View {
                 }
                 ToolbarItem(placement: .principal) { ConnectionRow() }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingNewGroup = true } label: {
+                    Menu {
+                        Button {
+                            showingNewAgent = true
+                        } label: {
+                            Label("New Agent", systemImage: "person.badge.plus")
+                        }
+                        Button {
+                            showingNewGroup = true
+                        } label: {
+                            Label("New Group", systemImage: "person.2.badge.plus")
+                        }
+                        .disabled(store.agents.isEmpty)
+                    } label: {
                         Image(systemName: "plus")
                     }
-                    .disabled(store.agents.isEmpty)
                 }
             }
+            // Removing an agent deletes its detail screen and its DM out from
+            // under whatever is pushed, so pop back to the last screen that
+            // still exists instead of leaving an empty one on top.
+            .onChange(of: store.agents.count) { prunePath() }
+            .onChange(of: store.threads.count) { prunePath() }
             .sheet(isPresented: $showingSettings) { SetupView() }
             .sheet(isPresented: $showingNewGroup) { NewGroupView() }
+            .sheet(isPresented: $showingNewAgent) { NewAgentView() }
+        }
+    }
+
+    private func prunePath() {
+        guard let first = path.firstIndex(where: { !exists($0) }) else { return }
+        path.removeSubrange(first...)
+    }
+
+    private func exists(_ route: Route) -> Bool {
+        switch route {
+        case .thread(let id): store.thread(id) != nil
+        case .agent(let id), .connect(let id): store.agent(id) != nil
         }
     }
 }

@@ -33,6 +33,13 @@ final class RelayStore {
     var approvals: [Approval] = []
     var statusLines: [String: StatusLine] = [:]     // threadId -> ephemeral line
     var lastError: String?
+    /// The address to hand to an agent on another machine. The relay reports
+    /// its own LAN address, which is not what the app connected to on a
+    /// simulator (127.0.0.1) or over Tailscale.
+    var agentFacingURL: String = ""
+    /// Set when the relay confirms a newly minted agent, so the sheet can push
+    /// straight to its connect instructions.
+    var justMinted: Agent?
 
     private var task: URLSessionWebSocketTask?
     private var readTask: Task<Void, Never>?
@@ -156,7 +163,10 @@ final class RelayStore {
         let agents: [Agent]
         let threads: [ChatThread]
         let approvals: [Approval]
+        let relayUrl: String?
     }
+    private struct MintedEvent: Decodable { let agent: Agent; let relayUrl: String? }
+    private struct AgentRemovedEvent: Decodable { let agentId: String; let threadIds: [String] }
     private struct MessageEvent: Decodable { let message: Message }
     private struct StatusEvent: Decodable {
         let threadId: String, agentId: String, text: String
@@ -178,6 +188,7 @@ final class RelayStore {
             threads = e.threads
             approvals = e.approvals
             statusLines = [:]
+            agentFacingURL = e.relayUrl ?? relayURL
 
         case "message":
             guard let e = decode(MessageEvent.self, data) else { return }
@@ -222,6 +233,22 @@ final class RelayStore {
             } else {
                 approvals.append(e.approval)
             }
+
+        case "agent_minted":
+            guard let e = decode(MintedEvent.self, data) else { return }
+            if let url = e.relayUrl { agentFacingURL = url }
+            if let i = agents.firstIndex(where: { $0.id == e.agent.id }) {
+                agents[i] = e.agent
+            } else {
+                agents.append(e.agent)
+            }
+            justMinted = e.agent
+
+        case "agent_removed":
+            guard let e = decode(AgentRemovedEvent.self, data) else { return }
+            agents.removeAll { $0.id == e.agentId }
+            threads.removeAll { e.threadIds.contains($0.id) }
+            approvals.removeAll { e.threadIds.contains($0.threadId) }
 
         case "error":
             lastError = decode(ErrorEvent.self, data)?.error
@@ -286,6 +313,21 @@ final class RelayStore {
         ]
         if let name, !name.isEmpty { payload["name"] = name }
         send(payload)
+    }
+
+    func mintAgent(name: String, avatarEmoji: String) {
+        justMinted = nil
+        send(["type": "mint_agent", "name": name, "avatar_emoji": avatarEmoji])
+    }
+
+    func deleteAgent(_ agentId: String) {
+        send(["type": "delete_agent", "agent_id": agentId])
+    }
+
+    /// The line to run on the machine where Hermes lives.
+    func hermesInstallCommand(for agent: Agent) -> String {
+        let url = agentFacingURL.isEmpty ? relayURL : agentFacingURL
+        return "./adapters/hermes/install.sh <hermes-checkout> \(url) \(agent.connectToken ?? "")"
     }
 
     func decide(approvalId: String, decision: String) {

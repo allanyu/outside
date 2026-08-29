@@ -19,6 +19,11 @@ export class AgentClient {
     this.closed = false;
   }
 
+  /** Tokens minted by the app identify one agent; the shared relay token does not. */
+  get usesConnectToken() {
+    return String(this.token).startsWith("ai_");
+  }
+
   get wsUrl() {
     const u = new URL(this.relayUrl);
     u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
@@ -32,12 +37,18 @@ export class AgentClient {
 
     this.ws.on("open", () => {
       this.backoff = 500;
-      this.send({
-        type: "register",
-        agent_id: this.id,
-        name: this.name,
-        avatar_emoji: this.avatar,
-      });
+      // With a per-agent connect token the relay already knows who we are,
+      // so id/name/avatar are omitted and its stored values win.
+      this.send(
+        this.usesConnectToken
+          ? { type: "register" }
+          : {
+              type: "register",
+              agent_id: this.id,
+              name: this.name,
+              avatar_emoji: this.avatar,
+            }
+      );
     });
 
     this.ws.on("message", (raw) => {
@@ -48,6 +59,9 @@ export class AgentClient {
         return;
       }
       if (msg.type === "registered") {
+        this.id = msg.agent.id;
+        this.name = msg.agent.name;
+        this.avatar = msg.agent.avatar_emoji;
         this.threads = msg.threads ?? [];
         this.log(`online, ${this.threads.length} thread(s)`);
         this.onReady(this);

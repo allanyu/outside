@@ -35,4 +35,5 @@ struct RootView: View {
 enum Route: Hashable {
     case thread(String)
     case agent(String)
+    case connect(String)
 }

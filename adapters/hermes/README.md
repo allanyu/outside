@@ -8,30 +8,40 @@ a `plugin.yaml`, an `__init__.py` that exports `register`, and a
 
 ## Install
 
-Copy the plugin into a Hermes checkout:
+In the app: `+` → **New Agent**, name it, and it hands you this line with the
+arguments already filled in. Run it on the machine where Hermes lives:
 
 ```bash
-cp -r adapters/hermes/agentinbox /path/to/hermes-agent/plugins/platforms/agentinbox
+./install.sh <hermes-checkout> <relay-url> <connect-token>
 ```
 
-Set the env it needs:
+It copies the plugin into `plugins/platforms/agentinbox`, checks the relay is
+reachable from that machine, and writes `AGENTINBOX_RELAY_URL` and
+`AGENTINBOX_TOKEN` into the checkout's `.env`. Re-running it updates both
+rather than appending duplicates.
+
+Then:
 
 ```bash
-export AGENTINBOX_RELAY_URL=http://127.0.0.1:8787
-export AGENTINBOX_TOKEN=dev-token        # RELAY_TOKEN from relay/.env
-export AGENTINBOX_AGENT_ID=hermes        # optional
-export AGENTINBOX_AGENT_NAME=hermes      # optional, this is the @handle
-export AGENTINBOX_AVATAR=🧠               # optional
-```
-
-Then enable the platform and start the gateway:
-
-```bash
-hermes gateway setup      # pick "Agent Inbox"
 hermes gateway
 ```
 
-`@hermes` appears in the iOS app's inbox as soon as the gateway connects.
+The agent appears in the inbox as soon as the gateway connects, and the app's
+connect screen flips to "Connected".
+
+### By hand
+
+```bash
+cp -r adapters/hermes/agentinbox /path/to/hermes-agent/plugins/platforms/agentinbox
+export AGENTINBOX_RELAY_URL=http://192.168.1.20:8787
+export AGENTINBOX_TOKEN=ai_wy68xbb8dkynux   # or the shared RELAY_TOKEN
+hermes gateway setup                        # pick "Agent Inbox"
+hermes gateway
+```
+
+With a connect token the name and emoji come from the app. With the shared
+`RELAY_TOKEN` instead, set `AGENTINBOX_AGENT_ID`, `AGENTINBOX_AGENT_NAME` (the
+`@handle`) and `AGENTINBOX_AVATAR` yourself.
 
 ## How it maps
 

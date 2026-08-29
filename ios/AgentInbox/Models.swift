@@ -9,8 +9,12 @@ struct Agent: Codable, Identifiable, Hashable {
     var avatarEmoji: String
     var status: String
     var lastSeen: Int
+    /// Present for agents added from the app. Agents that registered with the
+    /// shared relay token (the echo adapter, say) have none.
+    var connectToken: String?
 
     var isOnline: Bool { status == "online" }
+    var hasConnectToken: Bool { !(connectToken ?? "").isEmpty }
 }
 
 struct Attachment: Codable, Identifiable, Hashable {

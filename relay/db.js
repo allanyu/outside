@@ -17,7 +17,8 @@ export function openDb(dataDir) {
       name          TEXT NOT NULL,
       avatar_emoji  TEXT NOT NULL DEFAULT '🤖',
       status        TEXT NOT NULL DEFAULT 'offline',
-      last_seen     INTEGER NOT NULL DEFAULT 0
+      last_seen     INTEGER NOT NULL DEFAULT 0,
+      connect_token TEXT
     );
 
     CREATE TABLE IF NOT EXISTS threads (
@@ -66,6 +67,14 @@ export function openDb(dataDir) {
       created_at  INTEGER NOT NULL
     );
   `);
+  // Databases created before agents had their own connect tokens.
+  const columns = db.prepare("PRAGMA table_info(agents)").all().map((c) => c.name);
+  if (!columns.includes("connect_token")) {
+    db.exec("ALTER TABLE agents ADD COLUMN connect_token TEXT");
+  }
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_connect_token ON agents (connect_token) WHERE connect_token IS NOT NULL"
+  );
   return db;
 }
 
@@ -94,6 +103,42 @@ export function getAgent(id) {
 
 export function listAgents() {
   return db.prepare("SELECT * FROM agents ORDER BY name").all();
+}
+
+export function createAgentWithToken({ id, name, avatar_emoji, connect_token }) {
+  db.prepare(
+    `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, connect_token)
+     VALUES (?, ?, ?, 'offline', 0, ?)`
+  ).run(id, name, avatar_emoji, connect_token);
+  return getAgent(id);
+}
+
+export function getAgentByConnectToken(token) {
+  if (!token) return null;
+  return db.prepare("SELECT * FROM agents WHERE connect_token = ?").get(token);
+}
+
+/** Removes the agent and any thread it leaves with no agents in it. */
+export function deleteAgent(id) {
+  const threadIds = db
+    .prepare("SELECT thread_id FROM thread_participants WHERE participant_id = ?")
+    .all(id)
+    .map((r) => r.thread_id);
+
+  db.prepare("DELETE FROM thread_participants WHERE participant_id = ?").run(id);
+  db.prepare("DELETE FROM agents WHERE id = ?").run(id);
+
+  const removed = [];
+  for (const threadId of threadIds) {
+    const remaining = participantIds(threadId).filter((p) => p !== USER_ID);
+    if (remaining.length > 0) continue;
+    db.prepare("DELETE FROM messages WHERE thread_id = ?").run(threadId);
+    db.prepare("DELETE FROM approvals WHERE thread_id = ?").run(threadId);
+    db.prepare("DELETE FROM thread_participants WHERE thread_id = ?").run(threadId);
+    db.prepare("DELETE FROM threads WHERE id = ?").run(threadId);
+    removed.push(threadId);
+  }
+  return removed;
 }
 
 export function setAgentStatus(id, status, lastSeen) {
