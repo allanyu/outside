@@ -22,6 +22,24 @@ disk. That rules out serverless — on Vercel, connections close when the
 function hits its maximum duration and instances do not share memory. It wants
 a container with a volume.
 
+### Railway
+
+```bash
+cd relay
+railway login
+railway init                       # creates the project
+railway volume add --mount-path /data
+railway variables --set "RELAY_TOKEN=$(openssl rand -base64 24)"
+railway up                         # builds the Dockerfile
+railway domain                     # prints the public hostname
+railway variables --set "PUBLIC_URL=https://<that-hostname>"
+```
+
+`PUBLIC_URL` has to be set *after* the domain exists, and the service restarts
+when you set it. Railway injects `PORT` itself.
+
+### Fly
+
 ```bash
 cd relay
 fly launch --no-deploy          # takes fly.toml as it stands
@@ -31,8 +49,7 @@ fly secrets set PUBLIC_URL="https://<your-app>.fly.dev"
 fly deploy
 ```
 
-Any container host works the same way — Railway, Render, a VPS with the
-Dockerfile. Two things matter:
+Either way, two things matter:
 
 - **A volume at `DATA_DIR`.** Losing it loses every account, thread and image.
 - **Never scale to zero.** `auto_stop_machines = false` is deliberate: an idle
