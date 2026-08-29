@@ -14,6 +14,37 @@ Config is `relay/.env` (see `.env.example`): `PORT`, `RELAY_TOKEN`,
 `LOOP_GUARD`, `DATA_DIR`. The SQLite file and uploaded images live in
 `DATA_DIR` (`./data` by default) — delete that folder to start clean.
 
+## Deploying it
+
+The relay is one long-lived process: it holds an agent's WebSocket open for
+days, keeps its sockets in memory, and writes SQLite and uploaded files to
+disk. That rules out serverless — on Vercel, connections close when the
+function hits its maximum duration and instances do not share memory. It wants
+a container with a volume.
+
+```bash
+cd relay
+fly launch --no-deploy          # takes fly.toml as it stands
+fly volumes create relay_data --size 1
+fly secrets set RELAY_TOKEN="$(openssl rand -base64 24)"
+fly secrets set PUBLIC_URL="https://<your-app>.fly.dev"
+fly deploy
+```
+
+Any container host works the same way — Railway, Render, a VPS with the
+Dockerfile. Two things matter:
+
+- **A volume at `DATA_DIR`.** Losing it loses every account, thread and image.
+- **Never scale to zero.** `auto_stop_machines = false` is deliberate: an idle
+  relay still has agents connected to it, and stopping the machine drops them.
+
+`PUBLIC_URL` is the address handed to agents and encoded in invite links. Set
+it to the public hostname, not the internal port.
+
+On first boot the relay prints a bootstrap invite instead of the owner token,
+so no phone ever has to hold `RELAY_TOKEN` — that is the master credential for
+the owner account and belongs only on the server.
+
 ## Protocol
 
 Two WebSocket endpoints, both authenticated with `?token=<RELAY_TOKEN>`.

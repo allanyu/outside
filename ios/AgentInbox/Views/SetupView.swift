@@ -21,11 +21,13 @@ struct SetupView: View {
             Form {
                 if isFirstRun {
                     Section {
-                        TextField("http://192.168.1.20:8787", text: $url)
-                            .textContentType(.URL)
-                            .keyboardType(.URL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
+                        if !Config.hasDefaultRelay {
+                            TextField("http://192.168.1.20:8787", text: $url)
+                                .textContentType(.URL)
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
                         TextField("Invite code", text: $inviteCode)
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled()
@@ -38,9 +40,9 @@ struct SetupView: View {
                         }
                         .disabled(url.isEmpty || inviteCode.isEmpty || joining)
                     } header: {
-                        Text("Have an invite?")
+                        Text(Config.hasDefaultRelay ? "Enter your invite code" : "Have an invite?")
                     } footer: {
-                        Text("Tapping the invite link fills this in for you. You get your own agents and threads — nobody else's.")
+                        Text("Tapping the invite link does this for you. You get your own agents and threads — nobody else's.")
                     }
 
                     if let joinError = store.joinError {
@@ -101,7 +103,7 @@ struct SetupView: View {
                 }
             }
             .onAppear {
-                url = store.relayURL
+                url = store.relayURL.isEmpty ? Config.defaultRelayURL : store.relayURL
                 token = store.token
             }
         }

@@ -854,6 +854,24 @@ function lanAddress() {
 }
 
 const owner = ownerAccount();
+
+/**
+ * A bootstrap invite so the first device never has to hold RELAY_TOKEN. That
+ * token is the master credential for the owner account and belongs on the
+ * server, not on a phone.
+ */
+function bootstrapInvite() {
+  const open = db
+    .listInvites(owner.id)
+    .find((i) => !i.claimed_by && i.name === "bootstrap");
+  if (open) return open;
+  if (db.listAccounts().length > 1) return null;
+  return db.createInvite({
+    code: crypto.randomBytes(4).toString("hex").toUpperCase(),
+    created_by: owner.id,
+    name: "bootstrap",
+  });
+}
 {
   const adopted = db.adoptOrphans(owner.id);
   if (adopted.agents || adopted.threads) {
@@ -880,8 +898,16 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`  loopguard ${LOOP_GUARD}`);
   console.log(`  accounts  ${db.listAccounts().length}`);
   console.log("");
-  console.log(
-    `  agentinbox://connect?url=${encodeURIComponent(url)}&token=${encodeURIComponent(TOKEN)}`
-  );
+  const invite = bootstrapInvite();
+  if (invite) {
+    console.log("  no one has joined yet. Open this on a phone to claim it:");
+    console.log(
+      `  agentinbox://join?url=${encodeURIComponent(publicUrl())}&code=${invite.code}`
+    );
+  } else {
+    console.log(
+      `  agentinbox://connect?url=${encodeURIComponent(url)}&token=${encodeURIComponent(TOKEN)}`
+    );
+  }
   console.log("");
 });

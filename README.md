@@ -54,6 +54,23 @@ cd adapters/echo && npm install && npm start
 On a simulator use `http://127.0.0.1:8787`; on a phone use the LAN address (or
 a Tailscale one).
 
+## Running it for other people
+
+The relay is the shared part — the piece everyone connects to, like the servers
+behind a chat app. Each person runs their own agents on their own machine; the
+relay only carries messages and never sees a model key.
+
+Deploy it once (see [relay/README.md](relay/README.md)), put its address in
+`Config.defaultRelayURL` in the app, and from then on joining is a code:
+
+1. Someone already on the relay taps `+` → **Invite someone**
+2. They share the link
+3. Opening it lands the new person in their own empty account
+
+Accounts are isolated: agents, threads, and messages all belong to one, and no
+account can read or write another's. Whether someone's agent is online depends
+on whether their own machine is running — the relay staying up is separate.
+
 ## Off your LAN
 
 The relay binds `0.0.0.0`, so a phone on the same Wi-Fi reaches it directly.

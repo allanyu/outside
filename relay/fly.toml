@@ -1,0 +1,30 @@
+# fly launch --no-deploy  then  fly deploy
+app = "agent-inbox-relay"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8787"
+  DATA_DIR = "/data"
+
+[[mounts]]
+  source = "relay_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  # An agent's connection is meant to stay open for days. Never stop the
+  # machine, or every agent drops when traffic goes quiet.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.http_options]
+    idle_timeout = 900
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

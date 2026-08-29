@@ -11,6 +11,7 @@
 		16A089BAC1D08DABCDD9A006 /* Composer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD5C962D52184334A18D0E5 /* Composer.swift */; };
 		29F9801CAEE806433A350CF5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 04E9505D61CD86B7B292BF96 /* Assets.xcassets */; };
 		2B87C244C0EE81EF7EA2DD58 /* InviteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B960D10E9692F8A5A19E45A3 /* InviteView.swift */; };
+		3A6C6B34F55051578A989344 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9342FACFF0D1B6B2B24F2977 /* Config.swift */; };
 		3DC2882DFA5F5F3710F6C87C /* AgentInboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */; };
 		3FB5A43CE142751669D232D9 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9386E40AD6E745250BE7A74D /* SetupView.swift */; };
 		500E3DB97D21E7ED942C7A4E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C91834E5F6BD5CE338B154 /* Models.swift */; };
@@ -35,6 +36,7 @@
 		65BC8F3C2CAD41A3D729B078 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		84C91834E5F6BD5CE338B154 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		8EE09788A26E16E57810E8D1 /* AgentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDetailView.swift; sourceTree = "<group>"; };
+		9342FACFF0D1B6B2B24F2977 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		9386E40AD6E745250BE7A74D /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		949F491DFCCCD797044CD8B5 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
 		958DF83306E00918BCC44AF3 /* AgentInbox.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AgentInbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -66,6 +68,7 @@
 			children = (
 				B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */,
 				04E9505D61CD86B7B292BF96 /* Assets.xcassets */,
+				9342FACFF0D1B6B2B24F2977 /* Config.swift */,
 				65BC8F3C2CAD41A3D729B078 /* Info.plist */,
 				84C91834E5F6BD5CE338B154 /* Models.swift */,
 				1E51B677C02B7214828261ED /* RelayStore.swift */,
@@ -168,6 +171,7 @@
 				3DC2882DFA5F5F3710F6C87C /* AgentInboxApp.swift in Sources */,
 				83D8E8E6F602740A9EA60FE1 /* ApprovalCard.swift in Sources */,
 				16A089BAC1D08DABCDD9A006 /* Composer.swift in Sources */,
+				3A6C6B34F55051578A989344 /* Config.swift in Sources */,
 				7C56541BC4EA9D15751B23E2 /* InboxView.swift in Sources */,
 				2B87C244C0EE81EF7EA2DD58 /* InviteView.swift in Sources */,
 				BA34C40806ABF294F8CD4671 /* MessageRow.swift in Sources */,
