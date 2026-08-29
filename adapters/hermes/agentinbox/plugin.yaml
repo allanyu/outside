@@ -1,0 +1,31 @@
+name: agentinbox-platform
+label: Agent Inbox
+kind: platform
+version: 0.1.0
+description: >
+  Agent Inbox gateway adapter. Connects Hermes to an Agent Inbox relay over
+  /ws/agent and relays messages between relay threads (DMs and groups) and the
+  Hermes agent, so sessions and memory live in Hermes.
+author: agent-inbox
+requires_env:
+  - name: AGENTINBOX_RELAY_URL
+    description: "Base URL of the Agent Inbox relay, e.g. http://127.0.0.1:8787"
+    prompt: "Agent Inbox relay URL"
+    password: false
+  - name: AGENTINBOX_TOKEN
+    description: "Shared relay token (RELAY_TOKEN in the relay's .env)"
+    prompt: "Agent Inbox relay token"
+    password: true
+optional_env:
+  - name: AGENTINBOX_AGENT_ID
+    description: "Agent id this gateway registers as (default: hermes)"
+    prompt: "Agent id"
+    password: false
+  - name: AGENTINBOX_AGENT_NAME
+    description: "Display name, also the @mention handle (default: hermes)"
+    prompt: "Agent display name"
+    password: false
+  - name: AGENTINBOX_AVATAR
+    description: "Avatar emoji shown in the app (default: 🧠)"
+    prompt: "Avatar emoji"
+    password: false

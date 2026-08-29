@@ -1,0 +1,10 @@
+{
+  "name": "agent-inbox-ollama-adapter",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Generic OpenAI-compatible model shim for Agent Inbox (Ollama, llama.cpp, vLLM, ...)",
+  "scripts": { "start": "node index.js" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "ws": "^8.18.0" }
+}

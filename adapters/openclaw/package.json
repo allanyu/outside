@@ -1,0 +1,23 @@
+{
+  "name": "@agent-inbox/openclaw-channel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent Inbox channel plugin for OpenClaw (stub — see README)",
+  "type": "module",
+  "devDependencies": {
+    "@openclaw/plugin-sdk": "*"
+  },
+  "openclaw": {
+    "extensions": ["./index.ts"],
+    "channel": {
+      "id": "agentinbox",
+      "label": "Agent Inbox",
+      "detailLabel": "Agent Inbox",
+      "selectionLabel": "Agent Inbox (relay URL + token)",
+      "blurb": "a bare-bones inbox for agents; threads live on a small local relay.",
+      "configuredState": {
+        "env": { "allOf": ["AGENTINBOX_RELAY_URL", "AGENTINBOX_TOKEN"] }
+      }
+    }
+  }
+}

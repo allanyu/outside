@@ -1,0 +1,371 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0A024E31CC62363D7D21B62A /* RelayStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E51B677C02B7214828261ED /* RelayStore.swift */; };
+		16A089BAC1D08DABCDD9A006 /* Composer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD5C962D52184334A18D0E5 /* Composer.swift */; };
+		29F9801CAEE806433A350CF5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 04E9505D61CD86B7B292BF96 /* Assets.xcassets */; };
+		3DC2882DFA5F5F3710F6C87C /* AgentInboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */; };
+		3FB5A43CE142751669D232D9 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9386E40AD6E745250BE7A74D /* SetupView.swift */; };
+		500E3DB97D21E7ED942C7A4E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C91834E5F6BD5CE338B154 /* Models.swift */; };
+		7983F1101010233CA9F10201 /* NewGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCB2D4998FFEB87A8A3DA0F9 /* NewGroupView.swift */; };
+		7C56541BC4EA9D15751B23E2 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 949F491DFCCCD797044CD8B5 /* InboxView.swift */; };
+		83D8E8E6F602740A9EA60FE1 /* ApprovalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB4896D91023D800165B625 /* ApprovalCard.swift */; };
+		ABD81D56DC4E9DCB97EF7ECF /* ThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B34819FA2F847C79CA6915B /* ThreadView.swift */; };
+		BA34C40806ABF294F8CD4671 /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A171D822BA125D3D25E2160A /* MessageRow.swift */; };
+		DFF925C0376761543C702F86 /* AgentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EE09788A26E16E57810E8D1 /* AgentDetailView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		04E9505D61CD86B7B292BF96 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		0BD5C962D52184334A18D0E5 /* Composer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Composer.swift; sourceTree = "<group>"; };
+		1E51B677C02B7214828261ED /* RelayStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayStore.swift; sourceTree = "<group>"; };
+		1EB4896D91023D800165B625 /* ApprovalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalCard.swift; sourceTree = "<group>"; };
+		2B34819FA2F847C79CA6915B /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
+		65BC8F3C2CAD41A3D729B078 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		84C91834E5F6BD5CE338B154 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		8EE09788A26E16E57810E8D1 /* AgentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDetailView.swift; sourceTree = "<group>"; };
+		9386E40AD6E745250BE7A74D /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		949F491DFCCCD797044CD8B5 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		958DF83306E00918BCC44AF3 /* AgentInbox.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AgentInbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A171D822BA125D3D25E2160A /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
+		B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInboxApp.swift; sourceTree = "<group>"; };
+		BCB2D4998FFEB87A8A3DA0F9 /* NewGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGroupView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		2DAE18D7A2CD9A85BDC3589C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				958DF83306E00918BCC44AF3 /* AgentInbox.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		6693652B660AEFD3DED138B9 = {
+			isa = PBXGroup;
+			children = (
+				9729AC24D0D6BA687E170E97 /* AgentInbox */,
+				2DAE18D7A2CD9A85BDC3589C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		9729AC24D0D6BA687E170E97 /* AgentInbox */ = {
+			isa = PBXGroup;
+			children = (
+				B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */,
+				04E9505D61CD86B7B292BF96 /* Assets.xcassets */,
+				65BC8F3C2CAD41A3D729B078 /* Info.plist */,
+				84C91834E5F6BD5CE338B154 /* Models.swift */,
+				1E51B677C02B7214828261ED /* RelayStore.swift */,
+				C47C6FCE8D02DC34F67D5958 /* Views */,
+			);
+			path = AgentInbox;
+			sourceTree = "<group>";
+		};
+		C47C6FCE8D02DC34F67D5958 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				8EE09788A26E16E57810E8D1 /* AgentDetailView.swift */,
+				1EB4896D91023D800165B625 /* ApprovalCard.swift */,
+				0BD5C962D52184334A18D0E5 /* Composer.swift */,
+				949F491DFCCCD797044CD8B5 /* InboxView.swift */,
+				A171D822BA125D3D25E2160A /* MessageRow.swift */,
+				BCB2D4998FFEB87A8A3DA0F9 /* NewGroupView.swift */,
+				9386E40AD6E745250BE7A74D /* SetupView.swift */,
+				2B34819FA2F847C79CA6915B /* ThreadView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C6FD158CE21B19186FEB2596 /* AgentInbox */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9DB6BA441C8DE896A023E4E6 /* Build configuration list for PBXNativeTarget "AgentInbox" */;
+			buildPhases = (
+				5D95540A163B03AAE633DB7E /* Sources */,
+				E1DB11AF9506F57D530A274B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AgentInbox;
+			packageProductDependencies = (
+			);
+			productName = AgentInbox;
+			productReference = 958DF83306E00918BCC44AF3 /* AgentInbox.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7DF418F30942588C07ADCAE2 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					C6FD158CE21B19186FEB2596 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 3F66BDD0A91665AD5254B3BA /* Build configuration list for PBXProject "AgentInbox" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 6693652B660AEFD3DED138B9;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2DAE18D7A2CD9A85BDC3589C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C6FD158CE21B19186FEB2596 /* AgentInbox */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E1DB11AF9506F57D530A274B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				29F9801CAEE806433A350CF5 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5D95540A163B03AAE633DB7E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DFF925C0376761543C702F86 /* AgentDetailView.swift in Sources */,
+				3DC2882DFA5F5F3710F6C87C /* AgentInboxApp.swift in Sources */,
+				83D8E8E6F602740A9EA60FE1 /* ApprovalCard.swift in Sources */,
+				16A089BAC1D08DABCDD9A006 /* Composer.swift in Sources */,
+				7C56541BC4EA9D15751B23E2 /* InboxView.swift in Sources */,
+				BA34C40806ABF294F8CD4671 /* MessageRow.swift in Sources */,
+				500E3DB97D21E7ED942C7A4E /* Models.swift in Sources */,
+				7983F1101010233CA9F10201 /* NewGroupView.swift in Sources */,
+				0A024E31CC62363D7D21B62A /* RelayStore.swift in Sources */,
+				3FB5A43CE142751669D232D9 /* SetupView.swift in Sources */,
+				ABD81D56DC4E9DCB97EF7ECF /* ThreadView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1EECD9D44AA571F300BF2D4B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.allanyu.agentinbox;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		496047E1C08A329B798FA59B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AgentInbox/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Agent Inbox";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_NAME = AgentInbox;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		85B4EBD4BE5A6D6E71816F21 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AgentInbox/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Agent Inbox";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_NAME = AgentInbox;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		8B9A9CFA5274B71DF4D34ED2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.allanyu.agentinbox;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3F66BDD0A91665AD5254B3BA /* Build configuration list for PBXProject "AgentInbox" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1EECD9D44AA571F300BF2D4B /* Debug */,
+				8B9A9CFA5274B71DF4D34ED2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9DB6BA441C8DE896A023E4E6 /* Build configuration list for PBXNativeTarget "AgentInbox" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				85B4EBD4BE5A6D6E71816F21 /* Debug */,
+				496047E1C08A329B798FA59B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 7DF418F30942588C07ADCAE2 /* Project object */;
+}

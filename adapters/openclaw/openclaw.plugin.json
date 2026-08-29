@@ -1,0 +1,15 @@
+{
+  "id": "agentinbox",
+  "activation": { "onStartup": false },
+  "channels": ["agentinbox"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "relayUrl": { "type": "string" },
+      "agentId": { "type": "string" },
+      "agentName": { "type": "string" },
+      "avatar": { "type": "string" }
+    }
+  }
+}
