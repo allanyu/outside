@@ -35,6 +35,21 @@ PLATFORM_NAME = "agentinbox"
 
 
 def _env(name: str, default: str = "") -> str:
+    """Read config per-profile.
+
+    Under ``gateway.multiplex_profiles`` every profile is started inside its
+    own secret scope, and a raw ``os.environ`` read returns whichever profile
+    won the race — so two profiles would come up holding the same token and
+    the gateway would refuse the duplicate.
+    """
+    try:
+        from gateway.config import _getenv
+
+        scoped = _getenv(name, None)
+        if scoped is not None and str(scoped).strip():
+            return str(scoped).strip()
+    except Exception:  # pragma: no cover - single-profile fallback
+        pass
     return (os.environ.get(name) or default).strip()
 
 
@@ -92,14 +107,7 @@ class AgentInboxAdapter(BasePlatformAdapter):
             self._set_fatal_error("connect_failed", str(exc), retryable=True)
             return False
 
-        await self._send_json(
-            {
-                "type": "register",
-                "agent_id": self.agent_id,
-                "name": self.agent_name,
-                "avatar_emoji": self.avatar,
-            }
-        )
+        await self._send_json(self._register_frame())
         self._reader = asyncio.create_task(self._read_loop())
         self._mark_connected()
         logger.info("[AgentInbox] connected to %s as @%s", self.relay_url, self.agent_name)
@@ -114,6 +122,24 @@ class AgentInboxAdapter(BasePlatformAdapter):
             await self._ws.close()
             self._ws = None
         self._mark_disconnected()
+
+    @property
+    def _uses_connect_token(self) -> bool:
+        """A token minted in the app already names one agent."""
+        return self.token.startswith("aic_")
+
+    def _register_frame(self) -> Dict[str, Any]:
+        # With a connect token the relay knows who we are, and claiming a
+        # different agent_id is rejected. Only name ourselves when connecting
+        # with the shared relay token.
+        if self._uses_connect_token:
+            return {"type": "register"}
+        return {
+            "type": "register",
+            "agent_id": self.agent_id,
+            "name": self.agent_name,
+            "avatar_emoji": self.avatar,
+        }
 
     async def _send_json(self, payload: Dict[str, Any]) -> None:
         if self._ws is None:
@@ -153,14 +179,7 @@ class AgentInboxAdapter(BasePlatformAdapter):
             except Exception as exc:
                 logger.info("[AgentInbox] reconnect failed (%s), retrying", exc)
                 continue
-            await self._send_json(
-                {
-                    "type": "register",
-                    "agent_id": self.agent_id,
-                    "name": self.agent_name,
-                    "avatar_emoji": self.avatar,
-                }
-            )
+            await self._send_json(self._register_frame())
             self._mark_connected()
             logger.info("[AgentInbox] reconnected to %s", self.relay_url)
             self._reader = asyncio.create_task(self._read_loop())
@@ -169,6 +188,11 @@ class AgentInboxAdapter(BasePlatformAdapter):
     async def _dispatch(self, payload: Dict[str, Any]) -> None:
         kind = payload.get("type")
         if kind == "registered":
+            me = payload.get("agent") or {}
+            if me.get("id"):
+                self.agent_id = me["id"]
+                self.agent_name = me.get("name") or self.agent_id
+                self.avatar = me.get("avatar_emoji") or self.avatar
             for thread in payload.get("threads", []):
                 self._threads[thread["id"]] = thread
                 self._identity_for_thread[thread["id"]] = self.agent_id
@@ -305,6 +329,11 @@ def register(ctx) -> None:
         check_fn=agentinbox_deps_present,
         is_connected=_is_connected,
         required_env=["AGENTINBOX_RELAY_URL", "AGENTINBOX_TOKEN"],
+        # The relay is single-user behind a shared token, so the sender is
+        # always "user". Without these the gateway has no allowlist for this
+        # platform and falls back to pairing for every profile.
+        allowed_users_env="AGENTINBOX_ALLOWED_USERS",
+        allow_all_env="AGENTINBOX_ALLOW_ALL_USERS",
         install_hint="Set AGENTINBOX_RELAY_URL and AGENTINBOX_TOKEN, then restart the gateway.",
         cron_deliver_env_var="AGENTINBOX_HOME_THREAD",
         max_message_length=8000,

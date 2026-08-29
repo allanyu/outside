@@ -17,6 +17,10 @@ requires_env:
     prompt: "Agent Inbox relay token"
     password: true
 optional_env:
+  - name: AGENTINBOX_ALLOWED_USERS
+    description: "Relay senders allowed to talk to this agent. The relay is single-user, so this is just: user"
+    prompt: "Allowed users"
+    password: false
   - name: AGENTINBOX_AGENT_ID
     description: "Agent id this gateway registers as (default: hermes)"
     prompt: "Agent id"
