@@ -38,24 +38,28 @@ struct MessageRow: View {
         }
     }
 
+    // Attachments sit outside the bubble: an image-only message wrapped in a
+    // filled bubble reads as a thick coloured border around the picture.
     private var bubble: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: message.isFromUser ? .trailing : .leading, spacing: 6) {
             ForEach(message.attachments) { attachment in
                 AttachmentView(attachment: attachment)
             }
             if !message.text.isEmpty {
                 Text(markdown(message.text))
                     .textSelection(.enabled)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        message.isFromUser ? AnyShapeStyle(Color.accentColor)
+                                           : AnyShapeStyle(Color(.secondarySystemBackground)),
+                        in: .rect(cornerRadius: 18)
+                    )
+                    .foregroundStyle(
+                        message.isFromUser ? AnyShapeStyle(.white) : AnyShapeStyle(Color.primary)
+                    )
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            message.isFromUser ? AnyShapeStyle(Color.accentColor)
-                               : AnyShapeStyle(Color(.secondarySystemBackground)),
-            in: .rect(cornerRadius: 18)
-        )
-        .foregroundStyle(message.isFromUser ? AnyShapeStyle(.white) : AnyShapeStyle(Color.primary))
     }
 
     private func markdown(_ text: String) -> AttributedString {

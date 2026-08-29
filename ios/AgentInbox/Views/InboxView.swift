@@ -89,7 +89,17 @@ struct ThreadRow: View {
         guard let last = store.lastMessage(thread) else { return "No messages yet" }
         let who = last.isFromUser ? "You: " : (thread.isDM ? "" : "\(store.agent(last.senderId)?.name ?? last.senderId): ")
         if last.text.isEmpty && !last.attachments.isEmpty { return "\(who)📎 Attachment" }
-        return who + last.text
+        return who + plainText(last.text)
+    }
+
+    /// The preview is one plain line, so drop the markdown markers rather than
+    /// showing raw `**bold**` in the list.
+    private func plainText(_ text: String) -> String {
+        guard let attributed = try? AttributedString(
+            markdown: text,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        ) else { return text }
+        return String(attributed.characters)
     }
 
     private func relativeFormat(_ date: Date) -> Date.FormatStyle {

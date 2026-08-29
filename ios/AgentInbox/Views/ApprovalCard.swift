@@ -19,14 +19,19 @@ struct ApprovalCard: View {
                         store.decide(approvalId: approval.id, decision: option)
                     } label: {
                         Text(option)
+                            .font(.subheadline.weight(.medium))
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(background(for: option), in: .capsule)
+                            .foregroundStyle(foreground(for: option))
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(approval.decision == option ? Color.accentColor : Color.gray.opacity(0.35))
-                    .foregroundStyle(approval.decision == option ? Color.white : Color.primary)
+                    .buttonStyle(.plain)
                 }
             }
-            .disabled(approval.isDecided)
+            // allowsHitTesting rather than disabled: disabled dims the chosen
+            // option too, which made the decision harder to read than the
+            // option that was not taken.
+            .allowsHitTesting(!approval.isDecided)
 
             if let decision = approval.decision {
                 Text("You chose \(decision)")
@@ -41,5 +46,19 @@ struct ApprovalCard: View {
             RoundedRectangle(cornerRadius: 18)
                 .stroke(Color.accentColor.opacity(approval.isDecided ? 0 : 0.4), lineWidth: 1)
         )
+    }
+
+    private func isChosen(_ option: String) -> Bool { approval.decision == option }
+
+    private func background(for option: String) -> AnyShapeStyle {
+        if isChosen(option) { return AnyShapeStyle(Color.accentColor) }
+        if approval.isDecided { return AnyShapeStyle(Color(.tertiarySystemFill)) }
+        return AnyShapeStyle(Color.accentColor.opacity(0.15))
+    }
+
+    private func foreground(for option: String) -> AnyShapeStyle {
+        if isChosen(option) { return AnyShapeStyle(Color.white) }
+        if approval.isDecided { return AnyShapeStyle(Color.secondary) }
+        return AnyShapeStyle(Color.accentColor)
     }
 }
