@@ -82,6 +82,10 @@ class AgentInboxAdapter(BasePlatformAdapter):
         self._identity_for_thread: Dict[str, str] = {}
         # agent id -> the Hermes profile that should answer as it
         self._profile_for_agent: Dict[str, str] = {}
+        # relay thread id -> session tag. Hermes keys a session partly on
+        # thread_id, so a new tag lands the next message in a session with no
+        # link to the previous one.
+        self._session_tag: Dict[str, str] = {}
         # Threads mid-rotation. The app has already asked the user, so Hermes'
         # own confirmation is answered here and never shown.
         self._rotating: set = set()
@@ -257,6 +261,9 @@ class AgentInboxAdapter(BasePlatformAdapter):
         thread_id = thread.get("id", "")
         if thread_id:
             self._identity_for_thread[thread_id] = identity
+        tag = thread.get("session_tag")
+        if thread_id and tag:
+            self._session_tag[thread_id] = str(tag)
         # DMs are always for us; in groups the relay tells us when we were @-ed.
         if thread.get("kind") != "dm" and not payload.get("mentioned"):
             return
@@ -269,6 +276,9 @@ class AgentInboxAdapter(BasePlatformAdapter):
             chat_type="dm" if thread.get("kind") == "dm" else "group",
             user_id=sender,
             user_name=sender,
+            # Part of the session key: a new tag means a new conversation that
+            # is not recorded as following the old one.
+            thread_id=self._session_tag.get(thread_id),
             message_id=message.get("id"),
         )
         # Route the turn to the Hermes profile this identity stands for. One
@@ -291,12 +301,33 @@ class AgentInboxAdapter(BasePlatformAdapter):
         await self.handle_message(event)
 
     async def _rotate_session(self, payload: Dict[str, Any]) -> None:
-        """Start a fresh session for one profile.
+        """Start a fresh conversation for one profile.
 
-        Hermes already knows how to do this -- ``/new`` is one of its gateway
-        commands -- so this hands it the command rather than reaching into the
-        session store, and the profile keeps its long-term memory.
+        Two shapes, because they mean different things on the backend:
+
+        ``continue`` runs Hermes' own ``/new``. That records the new session as
+        following the old one, which is what makes the desktop show them as a
+        chain.
+
+        ``separate`` changes the session tag instead. Hermes keys a session
+        partly on thread id, so the next message simply lands in a session it
+        has never seen -- unrelated to anything before it. Nothing to reset.
+
+        Either way the profile keeps its long-term memory; only the
+        conversation starts over.
         """
+        mode = payload.get("mode", "continue")
+        tag = payload.get("session_tag")
+        thread_key = payload.get("thread_id") or ""
+        if tag:
+            self._session_tag[thread_key] = str(tag)
+        if mode == "separate":
+            logger.info(
+                "[AgentInbox] separate conversation for '%s' (tag %s)",
+                payload.get("profile") or payload.get("agent_id"),
+                tag,
+            )
+            return
         thread_id = payload.get("thread_id") or ""
         identity = payload.get("agent_id") or self.agent_id
         profile = payload.get("profile") or self._profile_for_agent.get(identity)

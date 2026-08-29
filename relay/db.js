@@ -118,6 +118,11 @@ export function openDb(dataDir) {
   if (!threadCols.includes("session_started_at")) {
     db.exec("ALTER TABLE threads ADD COLUMN session_started_at INTEGER NOT NULL DEFAULT 0");
   }
+  // Passed to the backend as the thread it should key a session under.
+  // Changing it starts a conversation with no link to the previous one.
+  if (!threadCols.includes("session_tag")) {
+    db.exec("ALTER TABLE threads ADD COLUMN session_tag TEXT");
+  }
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_connect_token ON agents (connect_token) WHERE connect_token IS NOT NULL"
   );
@@ -449,11 +454,22 @@ export function messagesForThread(threadId, { since = null, limit = 100 } = {}) 
     .reverse();
 }
 
-export function startNewSession(threadId) {
-  db.prepare("UPDATE threads SET session_started_at = ? WHERE id = ?").run(
-    now(),
-    threadId
-  );
+/**
+ * Clear the visible transcript. `sessionTag` is only passed for a separate
+ * conversation: a new tag means a new session key on the backend, so the new
+ * conversation is not recorded as following the old one.
+ */
+export function startNewSession(threadId, sessionTag = undefined) {
+  if (sessionTag === undefined) {
+    db.prepare("UPDATE threads SET session_started_at = ? WHERE id = ?").run(
+      now(),
+      threadId
+    );
+  } else {
+    db.prepare(
+      "UPDATE threads SET session_started_at = ?, session_tag = ? WHERE id = ?"
+    ).run(now(), sessionTag, threadId);
+  }
   return getThread(threadId);
 }
 

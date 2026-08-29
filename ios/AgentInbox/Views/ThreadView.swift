@@ -4,7 +4,7 @@ struct ThreadView: View {
     @Environment(RelayStore.self) private var store
     let threadId: String
 
-    @State private var confirmingNewSession = false
+    @State private var pendingMode: RelayStore.SessionMode?
 
     private var thread: ChatThread? { store.thread(threadId) }
     private var messages: [Message] { thread?.messages ?? [] }
@@ -55,9 +55,14 @@ struct ThreadView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
-                        confirmingNewSession = true
+                        pendingMode = .continuing
                     } label: {
-                        Label("Start new session", systemImage: "arrow.counterclockwise")
+                        Label("New session", systemImage: "arrow.counterclockwise")
+                    }
+                    Button {
+                        pendingMode = .separate
+                    } label: {
+                        Label("Separate conversation", systemImage: "square.on.square")
                     }
                     if let agentId = thread?.agentIds.first {
                         NavigationLink(value: Route.agent(agentId)) {
@@ -78,15 +83,29 @@ struct ThreadView: View {
             }
         }
         .confirmationDialog(
-            "Start a new session with \(thread.map(store.title(for:)) ?? "this bot")?",
-            isPresented: $confirmingNewSession,
+            pendingMode == .separate
+                ? "Start a separate conversation?"
+                : "Start a new session?",
+            isPresented: Binding(
+                get: { pendingMode != nil },
+                set: { if !$0 { pendingMode = nil } }
+            ),
             titleVisibility: .visible
         ) {
-            Button("Start new session") { store.startNewSession(in: threadId) }
+            Button(pendingMode == .separate ? "Start separate" : "Start new") {
+                store.startNewSession(in: threadId, mode: pendingMode ?? .continuing)
+                pendingMode = nil
+            }
         } message: {
-            Text("The current conversation is cleared. Its long-term memory is kept.")
+            Text(
+                pendingMode == .separate
+                    ? "Starts on its own, with no link to this conversation. \(store.title(for: thread ?? placeholderThread)) keeps its long-term memory."
+                    : "Clears this conversation and records the new one as following it. \(store.title(for: thread ?? placeholderThread)) keeps its long-term memory."
+            )
         }
     }
+
+    private var placeholderThread: ChatThread { emptyThread }
 
     private var emptyThread: ChatThread {
         ChatThread(id: threadId, kind: "dm", name: nil, participantIds: [], createdAt: 0, messages: [])

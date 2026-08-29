@@ -623,25 +623,35 @@ function handleAppMessage(ws, msg) {
       break;
     }
     // Chats mirror the backend's profiles, so the app cannot make one.
+    // Two ways to start over, and they differ on the backend:
+    //   "continue" — the backend resets, recording the new conversation as
+    //                following the old one, so its history stays traceable.
+    //   "separate" — a new session key, so the conversation is unrelated to
+    //                anything before it.
     case "new_session": {
       const thread = db.getThread(msg.thread_id);
       if (!thread || thread.account_id !== accountId) {
         throw new Error("no such thread");
       }
+      const separate = msg.mode === "separate";
       const agentId = thread.participant_ids.find((p) => p !== USER_ID);
       const agent = agentId ? db.getAgent(agentId) : null;
-      const updated = db.startNewSession(thread.id);
+
+      const tag = separate ? crypto.randomBytes(6).toString("hex") : undefined;
+      db.startNewSession(thread.id, tag);
       toApp(accountId, { type: "thread", thread: threadPayload(thread.id) });
-      // Tell the backend to rotate its own session for this profile.
+
       if (agent?.host_id) {
         toAgent(agent.host_id, {
           type: "new_session",
+          mode: separate ? "separate" : "continue",
           agent_id: agent.id,
           thread_id: thread.id,
+          session_tag: db.getThread(thread.id).session_tag,
           profile: agent.profile,
         });
       }
-      log(`new session in ${agent?.name ?? thread.id}`);
+      log(`${separate ? "separate" : "new"} session in ${agent?.name ?? thread.id}`);
       break;
     }
     case "decide": {

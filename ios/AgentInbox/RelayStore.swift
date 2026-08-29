@@ -372,10 +372,18 @@ final class RelayStore {
         return "agentinbox://join?url=\(encoded)&code=\(invite.code)"
     }
 
-    /// Rotate this chat's session on the backend. The chat stays; the
-    /// transcript starts over and the profile keeps its long-term memory.
-    func startNewSession(in threadId: String) {
-        send(["type": "new_session", "thread_id": threadId])
+    enum SessionMode: String {
+        /// Recorded as following the current conversation — the backend keeps
+        /// the trail, and Hermes' desktop shows them as a chain.
+        case continuing = "continue"
+        /// Unrelated to anything before it. Starts on its own.
+        case separate
+    }
+
+    /// Start over in this chat. The chat stays and the bot keeps its long-term
+    /// memory; only the conversation resets.
+    func startNewSession(in threadId: String, mode: SessionMode = .continuing) {
+        send(["type": "new_session", "thread_id": threadId, "mode": mode.rawValue])
     }
 
     func decide(approvalId: String, decision: String) {
