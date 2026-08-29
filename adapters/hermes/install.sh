@@ -42,7 +42,19 @@ if command -v curl >/dev/null 2>&1; then
   fi
 fi
 
-ENV_FILE="$HERMES/.env"
+# Hermes loads $HERMES_HOME/.env first and only falls back to the checkout's
+# own .env for development, so write to the home when there is one.
+HERMES_HOME="${HERMES_HOME:-}"
+if [ -z "$HERMES_HOME" ]; then
+  PARENT="$(dirname "$HERMES")"
+  if [ -f "$PARENT/config.yaml" ]; then
+    HERMES_HOME="$PARENT"
+  else
+    HERMES_HOME="$HERMES"
+  fi
+fi
+
+ENV_FILE="$HERMES_HOME/.env"
 touch "$ENV_FILE"
 
 set_env() {
