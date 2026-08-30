@@ -7,6 +7,7 @@ import express from "express";
 import { WebSocketServer } from "ws";
 import { loadEnv } from "./env.js";
 import * as db from "./db.js";
+import { verifyAppleToken } from "./apple.js";
 import { USER_ID } from "./db.js";
 
 loadEnv();
@@ -15,6 +16,8 @@ const PORT = Number(process.env.PORT || 8787);
 const TOKEN = process.env.RELAY_TOKEN || "dev-token";
 const LOOP_GUARD = Number(process.env.LOOP_GUARD || 6);
 const DATA_DIR = path.resolve(process.env.DATA_DIR || "./data");
+// The audience an Apple identity token must name: this app's bundle id.
+const APPLE_BUNDLE_ID = process.env.APPLE_BUNDLE_ID || "com.allanyu.agentinbox";
 const FILES_DIR = path.join(DATA_DIR, "files");
 
 db.openDb(DATA_DIR);
@@ -264,6 +267,48 @@ function requireToken(req, res, next) {
 }
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+/**
+ * Sign in with Apple. The identity token is the whole credential -- it is
+ * verified against Apple's published keys, and its subject is what identifies
+ * the person. Nothing else about them is stored.
+ *
+ * Same endpoint signs up and signs in: a subject we have not seen gets a new
+ * account, one we have seen gets its existing token back.
+ */
+app.post("/api/auth/apple", async (req, res) => {
+  const idToken = String(req.body?.identity_token || "");
+  const name = String(req.body?.name || "").trim().slice(0, 40);
+  if (!idToken) return res.status(400).json({ error: "identity_token required" });
+
+  let claims;
+  try {
+    claims = await verifyAppleToken(idToken, APPLE_BUNDLE_ID);
+  } catch (err) {
+    log(`apple sign-in rejected: ${err.message}`);
+    return res.status(401).json({ error: "could not verify that sign-in" });
+  }
+
+  let account = db.getAccountByAppleSub(claims.sub);
+  if (!account) {
+    account = db.createAccount({
+      id: uid(),
+      name: name || "You",
+      token: secret("acct"),
+      apple_sub: claims.sub,
+    });
+    log(`new account via Apple: ${account.name}`);
+  } else if (name && account.name === "You") {
+    // Apple only sends a name the first time; take it if we never got one.
+    account = db.renameAccount(account.id, name);
+  }
+
+  res.json({
+    account: { id: account.id, name: account.name, is_owner: !!account.is_owner },
+    token: account.token,
+    relay_url: publicUrl(),
+  });
+});
 
 /**
  * Redeem an invite. This is the only unauthenticated write: the code itself is

@@ -18,7 +18,10 @@ export function openDb(dataDir) {
       name        TEXT NOT NULL,
       token       TEXT NOT NULL UNIQUE,
       is_owner    INTEGER NOT NULL DEFAULT 0,
-      created_at  INTEGER NOT NULL
+      created_at  INTEGER NOT NULL,
+      -- Apple's stable subject id. The only thing tying an account to a
+      -- person, and it is opaque -- no email, no name unless they type one.
+      apple_sub   TEXT UNIQUE
     );
 
     CREATE TABLE IF NOT EXISTS invites (
@@ -105,6 +108,12 @@ export function openDb(dataDir) {
   if (!columns.includes("available_profiles")) {
     db.exec("ALTER TABLE agents ADD COLUMN available_profiles TEXT");
   }
+  const accountCols = db.prepare("PRAGMA table_info(accounts)").all().map((c) => c.name);
+  if (!accountCols.includes("apple_sub")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN apple_sub TEXT");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_apple_sub ON accounts (apple_sub) WHERE apple_sub IS NOT NULL");
+  }
+
   // Everything belongs to an account. One relay, many people, no shared view.
   if (!columns.includes("account_id")) {
     db.exec("ALTER TABLE agents ADD COLUMN account_id TEXT");
@@ -133,11 +142,16 @@ export const now = () => Date.now();
 
 /* ---------- accounts ---------- */
 
-export function createAccount({ id, name, token, is_owner = 0 }) {
+export function createAccount({ id, name, token, is_owner = 0, apple_sub = null }) {
   db.prepare(
-    "INSERT INTO accounts (id, name, token, is_owner, created_at) VALUES (?, ?, ?, ?, ?)"
-  ).run(id, name, token, is_owner ? 1 : 0, now());
+    "INSERT INTO accounts (id, name, token, is_owner, created_at, apple_sub) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(id, name, token, is_owner ? 1 : 0, now(), apple_sub);
   return getAccount(id);
+}
+
+export function getAccountByAppleSub(sub) {
+  if (!sub) return null;
+  return db.prepare("SELECT * FROM accounts WHERE apple_sub = ?").get(sub);
 }
 
 export function getAccount(id) {

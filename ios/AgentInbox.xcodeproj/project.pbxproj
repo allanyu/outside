@@ -38,6 +38,7 @@
 		A171D822BA125D3D25E2160A /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
 		B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInboxApp.swift; sourceTree = "<group>"; };
 		B960D10E9692F8A5A19E45A3 /* InviteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteView.swift; sourceTree = "<group>"; };
+		D2378EC143E1B7B9D2BE03FF /* AgentInbox.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AgentInbox.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -60,6 +61,7 @@
 		9729AC24D0D6BA687E170E97 /* AgentInbox */ = {
 			isa = PBXGroup;
 			children = (
+				D2378EC143E1B7B9D2BE03FF /* AgentInbox.entitlements */,
 				B7061A7AEED005A9A4510762 /* AgentInboxApp.swift */,
 				04E9505D61CD86B7B292BF96 /* Assets.xcassets */,
 				9342FACFF0D1B6B2B24F2977 /* Config.swift */,
@@ -248,6 +250,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = AgentInbox/AgentInbox.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AgentInbox/Info.plist;
@@ -270,6 +273,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = AgentInbox/AgentInbox.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AgentInbox/Info.plist;

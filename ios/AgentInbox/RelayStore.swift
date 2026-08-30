@@ -93,6 +93,43 @@ final class RelayStore {
         }
     }
 
+    /// Sign in with Apple. Apple hands us an identity token; the relay checks
+    /// it against Apple's keys and returns this person's account. Signing up
+    /// and signing back in are the same call.
+    func signInWithApple(identityToken: Data, fullName: String) async {
+        joinError = nil
+        let base = Config.hasDefaultRelay ? Config.defaultRelayURL : relayURL
+        guard var comps = URLComponents(string: base) else {
+            joinError = "No relay is configured."
+            return
+        }
+        comps.path = "/api/auth/apple"
+        guard let url = comps.url else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "identity_token": String(decoding: identityToken, as: UTF8.self),
+            "name": fullName,
+        ])
+        do {
+            let (body, response) = try await session.data(for: request)
+            struct AuthResponse: Decodable { let token: String }
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                struct ErrorResponse: Decodable { let error: String }
+                joinError = (try? Self.decoder.decode(ErrorResponse.self, from: body))?.error
+                    ?? "That sign-in didn't work."
+                return
+            }
+            let auth = try Self.decoder.decode(AuthResponse.self, from: body)
+            save(relayURL: base, token: auth.token)
+            connect()
+        } catch {
+            joinError = error.localizedDescription
+        }
+    }
+
     /// Redeem an invite. The relay creates a fresh account and hands back its
     /// token, so a tester never sees anyone else's threads.
     func join(relayURL: String, code: String, displayName: String = "") async {

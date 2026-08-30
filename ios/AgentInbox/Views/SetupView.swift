@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct SetupView: View {
@@ -12,6 +13,28 @@ struct SetupView: View {
     @State private var joining = false
     @State private var profileName: String = ""
 
+    private func handleApple(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let auth):
+            guard
+                let credential = auth.credential as? ASAuthorizationAppleIDCredential,
+                let token = credential.identityToken
+            else {
+                store.joinError = "Apple didn't return a usable sign-in."
+                return
+            }
+            // Apple sends the name only on the very first sign-in.
+            let name = [credential.fullName?.givenName, credential.fullName?.familyName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            Task { await store.signInWithApple(identityToken: token, fullName: name) }
+        case .failure(let error):
+            // Cancelling is not an error worth showing.
+            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            store.joinError = error.localizedDescription
+        }
+    }
+
     private var canConnect: Bool {
         !url.trimmingCharacters(in: .whitespaces).isEmpty
             && !token.trimmingCharacters(in: .whitespaces).isEmpty
@@ -21,6 +44,21 @@ struct SetupView: View {
         NavigationStack {
             Form {
                 if isFirstRun {
+                    Section {
+                        SignInWithAppleButton(.signIn) { request in
+                            request.requestedScopes = [.fullName]
+                        } onCompletion: { result in
+                            handleApple(result)
+                        }
+                        .signInWithAppleButtonStyle(.black)
+                        .frame(height: 48)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    } header: {
+                        Text("Sign in")
+                    } footer: {
+                        Text("Your chats are yours alone. The relay stores nothing about you but the name you choose.")
+                    }
+
                     Section {
                         if !Config.hasDefaultRelay {
                             TextField("http://192.168.1.20:8787", text: $url)
@@ -41,7 +79,7 @@ struct SetupView: View {
                         }
                         .disabled(url.isEmpty || inviteCode.isEmpty || joining)
                     } header: {
-                        Text(Config.hasDefaultRelay ? "Enter your invite code" : "Have an invite?")
+                        Text("Or use an invite code")
                     } footer: {
                         Text("Tapping the invite link does this for you. You get your own agents and threads — nobody else's.")
                     }
