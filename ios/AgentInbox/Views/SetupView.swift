@@ -123,7 +123,7 @@ struct SetupView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 Button("Connect") {
-                    store.save(relayURL: url, token: token)
+                    store.save(relayURL: url, token: token, custom: true)
                     store.connect()
                     if !isFirstRun { dismiss() }
                 }

@@ -19,10 +19,37 @@ final class RelayStore {
     private enum Keys {
         static let url = "relayURL"
         static let token = "relayToken"
+        static let customURL = "relayURLIsCustom"
     }
 
-    var relayURL: String = UserDefaults.standard.string(forKey: Keys.url) ?? ""
-    var token: String = UserDefaults.standard.string(forKey: Keys.token) ?? ""
+    /// A saved address only outranks the one this build ships with when the
+    /// person typed it themselves, in Advanced or through a link.
+    ///
+    /// Otherwise the build wins, and the saved token goes with the old
+    /// address. The hosted relay can move; an install that clung to whatever
+    /// address it first saw would go on dialling a host that no longer
+    /// answers, showing an empty pairing code with no way back short of
+    /// signing out — which nobody would think to try. And a token the old
+    /// relay minted means nothing to the new one, so keeping it only buys a
+    /// silent 401 and a spinner where the sign-in screen should be.
+    private static func loadCredentials() -> (url: String, token: String) {
+        let defaults = UserDefaults.standard
+        let stored = defaults.string(forKey: Keys.url) ?? ""
+        let token = defaults.string(forKey: Keys.token) ?? ""
+        let isCustom = defaults.bool(forKey: Keys.customURL)
+
+        guard Config.hasDefaultRelay, !isCustom, stored != Config.defaultRelayURL else {
+            return (stored, token)
+        }
+        defaults.set(Config.defaultRelayURL, forKey: Keys.url)
+        defaults.removeObject(forKey: Keys.token)
+        return (Config.defaultRelayURL, "")
+    }
+
+    private static let loaded = RelayStore.loadCredentials()
+
+    var relayURL: String = RelayStore.loaded.url
+    var token: String = RelayStore.loaded.token
     var isConfigured: Bool { !relayURL.isEmpty && !token.isEmpty }
 
     // MARK: live state
@@ -54,11 +81,19 @@ final class RelayStore {
 
     // MARK: - lifecycle
 
-    func save(relayURL: String, token: String) {
+    /// ``custom`` marks an address the person chose over this build's own —
+    /// the Advanced field, or a link that named one. Only those survive an
+    /// update that moves the relay.
+    func save(relayURL: String, token: String, custom: Bool = false) {
         self.relayURL = relayURL.trimmingCharacters(in: .whitespacesAndNewlines)
         self.token = token.trimmingCharacters(in: .whitespacesAndNewlines)
         UserDefaults.standard.set(self.relayURL, forKey: Keys.url)
         UserDefaults.standard.set(self.token, forKey: Keys.token)
+        if custom {
+            UserDefaults.standard.set(true, forKey: Keys.customURL)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Keys.customURL)
+        }
     }
 
     func signOut() {
@@ -86,7 +121,7 @@ final class RelayStore {
         case "connect":
             let tok = items.first { $0.name == "token" }?.value ?? ""
             guard !relay.isEmpty, !tok.isEmpty else { return }
-            save(relayURL: relay, token: tok)
+            save(relayURL: relay, token: tok, custom: true)
             connect()
         case "join":
             let code = items.first { $0.name == "code" }?.value ?? ""
@@ -250,6 +285,16 @@ final class RelayStore {
                 }
             } catch {
                 guard !Task.isCancelled else { return }
+                // 401 means this token is not one the relay knows — it was
+                // issued by a different relay, or the account is gone. No
+                // number of retries fixes that, and retrying leaves the app
+                // stuck "connecting" with the sign-in screen out of reach,
+                // so drop the credential and let them sign in again.
+                if (task.response as? HTTPURLResponse)?.statusCode == 401 {
+                    signOut()
+                    lastError = "Please sign in again."
+                    return
+                }
                 connection = .failed(error.localizedDescription)
                 scheduleReconnect()
                 return

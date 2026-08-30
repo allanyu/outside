@@ -574,6 +574,10 @@ function syncProfiles(connectionId, profiles, accountId) {
         profile: profileName,
         account_id: accountId,
       });
+      // Agents are created offline, but this one is reported by a connection
+      // that is live right now — a bot made while the gateway is up would
+      // otherwise sit offline in the app until the next gateway restart.
+      db.setAgentStatus(id, "online");
       log(`chat added for '${display}'`);
     }
     live.add(id);
