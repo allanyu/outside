@@ -42,6 +42,8 @@ final class RelayStore {
     /// The most recent invite this account created.
     var lastInvite: Invite?
     var joinError: String?
+    /// The credential this account's Hermes connects with.
+    var gatewayToken: String?
 
     private var task: URLSessionWebSocketTask?
     private var readTask: Task<Void, Never>?
@@ -174,6 +176,21 @@ final class RelayStore {
         send(["type": "set_profile", "name": trimmed])
     }
 
+    func requestGatewayToken() {
+        send(["type": "gateway_token"])
+    }
+
+    /// The one command to run where Hermes lives.
+    var hermesSetupCommand: String {
+        let server = agentFacingURL.isEmpty ? relayURL : agentFacingURL
+        return """
+        hermes plugins install allanyu/outside/adapters/hermes/agentinbox
+        hermes plugins enable agentinbox-platform
+        AGENTINBOX_RELAY_URL=\(server)
+        AGENTINBOX_TOKEN=\(gatewayToken ?? "…")
+        """
+    }
+
     func createInvite(name: String) {
         lastInvite = nil
         send(["type": "create_invite", "name": name])
@@ -270,6 +287,7 @@ final class RelayStore {
     }
     private struct InviteEvent: Decodable { let invite: Invite; let relayUrl: String? }
     private struct AccountEvent: Decodable { let account: Account }
+    private struct GatewayTokenEvent: Decodable { let token: String; let relayUrl: String? }
     private struct AgentRemovedEvent: Decodable { let agentId: String; let threadIds: [String] }
     private struct MessageEvent: Decodable { let message: Message }
     private struct StatusEvent: Decodable {
@@ -338,6 +356,11 @@ final class RelayStore {
             } else {
                 approvals.append(e.approval)
             }
+
+        case "gateway_token":
+            guard let e = decode(GatewayTokenEvent.self, data) else { return }
+            if let url = e.relayUrl { agentFacingURL = url }
+            gatewayToken = e.token
 
         case "account":
             account = decode(AccountEvent.self, data)?.account

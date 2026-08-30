@@ -746,6 +746,24 @@ function handleAppMessage(ws, msg) {
       break;
     }
 
+    // The credential a backend uses to connect. One per account: whatever
+    // connects with it becomes that account's gateway, and the bots it reports
+    // become the chats. It is not a chat itself.
+    case "gateway_token": {
+      let gateway = db
+        .listAgents(accountId)
+        .find((a) => !a.profile && a.connect_token);
+      if (!gateway) {
+        gateway = mintAgent({ name: "gateway", account_id: accountId });
+      }
+      sendJson(ws, {
+        type: "gateway_token",
+        token: gateway.connect_token,
+        relay_url: publicUrl(),
+      });
+      break;
+    }
+
     // Invite someone else onto this relay. They get their own account: their
     // own agents, their own threads, no sight of yours.
     case "create_invite": {

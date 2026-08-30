@@ -5,6 +5,7 @@ struct InboxView: View {
     @State private var path: [Route] = []
     @State private var showingSettings = false
     @State private var showingInvite = false
+    @State private var showingConnect = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -13,7 +14,7 @@ struct InboxView: View {
                     ContentUnavailableView(
                         "No chats yet",
                         systemImage: "tray",
-                        description: Text("Your chats mirror the bots on your Hermes. Start its gateway and they appear here.")
+                        description: Text("Your chats mirror the bots on your Hermes. Tap + → Connect Hermes to set it up.")
                     )
                     .listRowSeparator(.hidden)
                 }
@@ -39,10 +40,19 @@ struct InboxView: View {
                 }
                 ToolbarItem(placement: .principal) { ConnectionRow() }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingInvite = true
+                    Menu {
+                        Button {
+                            showingConnect = true
+                        } label: {
+                            Label("Connect Hermes", systemImage: "desktopcomputer")
+                        }
+                        Button {
+                            showingInvite = true
+                        } label: {
+                            Label("Invite someone", systemImage: "person.crop.circle.badge.plus")
+                        }
                     } label: {
-                        Image(systemName: "person.crop.circle.badge.plus")
+                        Image(systemName: "plus")
                     }
                 }
             }
@@ -54,6 +64,7 @@ struct InboxView: View {
             .sheet(isPresented: $showingSettings) { SetupView() }
 
             .sheet(isPresented: $showingInvite) { InviteView() }
+            .sheet(isPresented: $showingConnect) { ConnectHermesView() }
         }
     }
 
