@@ -107,6 +107,87 @@ class AgentInboxAdapter(BasePlatformAdapter):
         query = urlencode({"token": self.token})
         return urlunsplit((scheme, parts.netloc, "/ws/agent", query, ""))
 
+    @property
+    def _looks_like_pair_code(self) -> bool:
+        """The short code the app shows, not a relay token.
+
+        Relay tokens are ``aic_``-prefixed and long; a pair code is six
+        characters. Anything short and alphanumeric is the code the user was
+        told to paste into Hermes' Messaging settings.
+        """
+        return (
+            bool(self.token)
+            and not self.token.startswith("aic_")
+            and len(self.token) <= 12
+            and self.token.isalnum()
+        )
+
+    def _redeem_pair_code(self) -> bool:
+        """Trade the app's pair code for this machine's relay token.
+
+        Setup tells the user to paste the six-character code from the app, so
+        that code is what lands in ``AGENTINBOX_TOKEN`` — but the relay only
+        accepts a token on the socket, and answers a pasted code with a 401
+        that says nothing about what went wrong. Redeeming here is what makes
+        the documented flow work at all.
+
+        Pair codes are single-use and short-lived, so the exchanged token is
+        written back to the profile's ``.env``: without that, the next
+        reconnect would present a spent code.
+        """
+        import urllib.error
+        import urllib.request
+
+        body = json.dumps({"code": self.token}).encode()
+        req = urllib.request.Request(
+            f"{self.relay_url}/api/pair",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                payload = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                self._set_fatal_error(
+                    "pair_code_invalid",
+                    "That pairing code is expired or already used. Open Agent "
+                    "Inbox, tap + then Connect Hermes for a fresh one, and "
+                    "paste it here again.",
+                    retryable=False,
+                )
+            else:
+                self._set_fatal_error(
+                    "pair_failed", f"pairing failed: HTTP {exc.code}", retryable=True
+                )
+            return False
+        except Exception as exc:
+            self._set_fatal_error("pair_failed", f"pairing failed: {exc}", retryable=True)
+            return False
+
+        token = str(payload.get("token") or "").strip()
+        if not token:
+            self._set_fatal_error(
+                "pair_failed", "relay returned no token", retryable=True
+            )
+            return False
+
+        self.token = token
+        try:
+            from hermes_cli.config import save_env_value
+
+            save_env_value("AGENTINBOX_TOKEN", token)
+        except Exception:
+            # Pairing still succeeded; only persistence failed, so this run
+            # works and the next restart asks for a fresh code.
+            logger.warning(
+                "[AgentInbox] paired, but could not save the token to .env",
+                exc_info=True,
+            )
+        logger.info("[AgentInbox] paired with the relay and saved this machine's token")
+        return True
+
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         self._closing = False
         # The relay replays everything since last_seen on register, so a
@@ -116,6 +197,9 @@ class AgentInboxAdapter(BasePlatformAdapter):
                 "missing_token", "AGENTINBOX_TOKEN is not set", retryable=False
             )
             return False
+        if self._looks_like_pair_code:
+            if not await asyncio.to_thread(self._redeem_pair_code):
+                return False
         try:
             self._ws = await websockets.connect(self._socket_url)
         except Exception as exc:
@@ -538,20 +622,24 @@ def _is_connected() -> bool:
     return bool(_active and _active.is_connected)
 
 
-def _ensure_multiplex_profiles() -> None:
-    """Turn on ``gateway.multiplex_profiles`` in the default profile's config.
+def _ensure_gateway_config() -> None:
+    """Write the two config keys Agent Inbox needs but nobody can click.
 
-    Every Hermes profile is a bot, and the app shows one chat per profile. But
-    without multiplexing the gateway only ever serves the default profile, so
-    ``source.profile`` is ignored and every bot answers as the default one.
+    ``gateway.multiplex_profiles`` — every Hermes profile is a bot, and the app
+    shows one chat per profile. Without multiplexing the gateway serves only the
+    default profile, ``source.profile`` is ignored, and every bot answers as the
+    default one. Hermes exposes this flag nowhere in its UI, so leaving it to
+    the user means hand-editing config.yaml.
 
-    There is no UI anywhere in Hermes for this flag — not Settings, not the
-    desktop app — so leaving it to the user means hand-editing config.yaml,
-    which a beta tester cannot be asked to do. The plugin sets it for them.
+    ``platforms.agentinbox.enabled`` — the Messaging settings pane sends this
+    only when its toggle is touched, and saving credentials alone posts
+    ``enabled=None``. The gateway then boots with no platform and the app sits
+    empty with no error anywhere the user can see.
 
-    Idempotent and fail-open: only writes when the flag is absent or falsy, and
-    never blocks registration. Writes to the DEFAULT root, since that is the
-    profile whose gateway becomes the multiplexer.
+    Neither is something a beta tester can be asked to get right, so the plugin
+    writes both when it loads. Idempotent, fail-open, and deliberately
+    absence-only for the platform toggle: once the key exists the user owns it,
+    so an explicit ``enabled: false`` is never overwritten.
     """
     try:
         from hermes_constants import get_default_hermes_root
@@ -562,29 +650,47 @@ def _ensure_multiplex_profiles() -> None:
             return
 
         cfg = read_user_config_raw(cfg_path)
+        changed = []
+
         # Hermes accepts the flag either top-level or nested under `gateway`.
-        if cfg.get("multiplex_profiles") or (cfg.get("gateway") or {}).get(
-            "multiplex_profiles"
+        if not (
+            cfg.get("multiplex_profiles")
+            or (cfg.get("gateway") or {}).get("multiplex_profiles")
         ):
+            gateway_cfg = cfg.get("gateway")
+            if not isinstance(gateway_cfg, dict):
+                gateway_cfg = {}
+            gateway_cfg["multiplex_profiles"] = True
+            cfg["gateway"] = gateway_cfg
+            changed.append("gateway.multiplex_profiles")
+
+        platforms = cfg.get("platforms")
+        if not isinstance(platforms, dict):
+            platforms = {}
+        entry = platforms.get(PLATFORM_NAME)
+        if not isinstance(entry, dict):
+            entry = {}
+        if "enabled" not in entry:
+            entry["enabled"] = True
+            platforms[PLATFORM_NAME] = entry
+            cfg["platforms"] = platforms
+            changed.append(f"platforms.{PLATFORM_NAME}.enabled")
+
+        if not changed:
             return
 
-        gateway_cfg = cfg.get("gateway")
-        if not isinstance(gateway_cfg, dict):
-            gateway_cfg = {}
-        gateway_cfg["multiplex_profiles"] = True
-        cfg["gateway"] = gateway_cfg
         atomic_config_write(cfg_path, cfg, sort_keys=False)
         logger.info(
-            "[AgentInbox] enabled gateway.multiplex_profiles so every Hermes "
-            "profile gets its own chat; takes effect on the next gateway start"
+            "[AgentInbox] set %s; takes effect on the next gateway start",
+            ", ".join(changed),
         )
     except Exception:
-        logger.debug("[AgentInbox] could not set multiplex_profiles", exc_info=True)
+        logger.debug("[AgentInbox] could not write gateway config", exc_info=True)
 
 
 def register(ctx) -> None:
     """Plugin entry point — called by the Hermes plugin system."""
-    _ensure_multiplex_profiles()
+    _ensure_gateway_config()
     ctx.register_platform(
         name=PLATFORM_NAME,
         label="Agent Inbox",
