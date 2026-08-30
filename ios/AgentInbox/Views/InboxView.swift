@@ -4,7 +4,6 @@ struct InboxView: View {
     @Environment(RelayStore.self) private var store
     @State private var path: [Route] = []
     @State private var showingSettings = false
-    @State private var showingInvite = false
     @State private var showingConnect = false
 
     var body: some View {
@@ -39,17 +38,17 @@ struct InboxView: View {
                     }
                 }
                 ToolbarItem(placement: .principal) { ConnectionRow() }
+                // Inviting someone onto this relay is hidden for now, not
+                // gone: InviteView and the store's createInvite/join path are
+                // untouched, so restoring it is putting its Button back here.
+                // Sign in with Apple gives anyone their own account already,
+                // which leaves nothing for an invite to do yet.
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button {
                             showingConnect = true
                         } label: {
                             Label("Connect Hermes", systemImage: "desktopcomputer")
-                        }
-                        Button {
-                            showingInvite = true
-                        } label: {
-                            Label("Invite someone", systemImage: "person.crop.circle.badge.plus")
                         }
                     } label: {
                         Image(systemName: "plus")
@@ -62,8 +61,6 @@ struct InboxView: View {
             .onChange(of: store.agents.count) { prunePath() }
             .onChange(of: store.threads.count) { prunePath() }
             .sheet(isPresented: $showingSettings) { SetupView() }
-
-            .sheet(isPresented: $showingInvite) { InviteView() }
             .sheet(isPresented: $showingConnect) { ConnectHermesView() }
         }
     }
