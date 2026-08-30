@@ -55,6 +55,15 @@
       <div class="token" id="code">—</div>
       <button class="copy" data-target="code">Copy code</button>
     </li>
+    <li>
+      <h2>Turn on multi-bot routing</h2>
+      <p>One line in <code>~/.hermes/config.yaml</code>, so each bot answers as itself rather than everything coming from your default bot.</p>
+      <span class="code">gateway:
+  multiplex_profiles: true</span>
+      <button class="copy" data-target="mux">Copy</button>
+      <span id="mux" hidden>gateway:
+  multiplex_profiles: true</span>
+    </li>
   </ol>
   <p class="muted">Your bots appear in Agent Inbox a few seconds after the gateway starts. New ones show up on their own.</p>
 </main>
