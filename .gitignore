@@ -14,3 +14,6 @@ build/
 *.xcuserstate
 *.xcscmblueprint
 __pycache__/
+adapters/claude-code/node_modules/
+adapters/claude-code/.env
+adapters/claude-code/sessions.json

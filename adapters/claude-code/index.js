@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { loadEnv } from "./env.js";
 import { AgentClient } from "./client.js";
 
@@ -52,11 +52,32 @@ function runClaude(threadId, prompt) {
   args.push(prompt);
 
   return new Promise((resolve) => {
-    execFile(
-      CLAUDE,
-      args,
-      { cwd: WORKDIR, timeout: TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 },
-      (err, stdout, stderr) => {
+    // stdin is closed, never inherited. Claude Code waits on it for a piped
+    // prompt, and an adapter started in the background holds a pipe that
+    // never closes -- so the CLI sits there and the chat gets back neither an
+    // answer nor an error, which reads as an adapter that does not work.
+    const child = spawn(CLAUDE, args, {
+      cwd: WORKDIR,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let settled = false;
+    child.stdout.on("data", (d) => (stdout += d));
+    child.stderr.on("data", (d) => (stderr += d));
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, TIMEOUT_MS);
+
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      {
         // A resume that fails (session pruned, different machine) should not
         // strand the chat: forget the id so the next message starts fresh.
         if (!stdout.trim()) {
@@ -64,7 +85,7 @@ function runClaude(threadId, prompt) {
             delete sessions[threadId];
             saveSessions(sessions);
           }
-          const why = err?.killed
+          const why = timedOut
             ? `No answer within ${TIMEOUT_MS / 1000}s.`
             : (stderr || err?.message || "claude produced no output").trim();
           return resolve({ text: why, ok: false });
@@ -82,7 +103,10 @@ function runClaude(threadId, prompt) {
         const text = String(out.result ?? "").trim();
         resolve({ text: text || "(no output)", ok: !out.is_error });
       }
-    );
+    };
+
+    child.on("error", (err) => finish(err));
+    child.on("close", () => finish(null));
   });
 }
 
