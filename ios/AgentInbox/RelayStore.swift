@@ -73,6 +73,10 @@ final class RelayStore {
     var gatewayToken: String?
     /// Short code standing in for it, so setup is one readable line.
     var pairCode: String?
+    /// The same, for Claude Code. Kept apart from ``pairCode`` so opening one
+    /// setup screen cannot hand the other screen a code minted for a
+    /// different agent.
+    var claudeCode: String?
 
     private var task: URLSessionWebSocketTask?
     private var readTask: Task<Void, Never>?
@@ -101,6 +105,8 @@ final class RelayStore {
         save(relayURL: "", token: "")
         account = nil
         lastInvite = nil
+        pairCode = nil
+        claudeCode = nil
         agents = []
         threads = []
         approvals = []
@@ -231,6 +237,25 @@ final class RelayStore {
     var connectCommand: String {
         let server = agentFacingURL.isEmpty ? relayURL : agentFacingURL
         return "curl -fsSL \(server)/connect.sh | sh -s \(pairCode ?? "…")"
+    }
+
+    func requestClaudeCode() {
+        claudeCode = nil
+        send(["type": "claude_code"])
+    }
+
+    /// The address to open on the machine where Claude Code is installed.
+    var claudeSetupURL: String {
+        let server = agentFacingURL.isEmpty ? relayURL : agentFacingURL
+        let host = server
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+        return "\(host)/setup-claude?code=\(claudeCode ?? "")"
+    }
+
+    var claudeCommand: String {
+        let server = agentFacingURL.isEmpty ? relayURL : agentFacingURL
+        return "curl -fsSL \(server)/claude.sh | sh -s \(claudeCode ?? "…")"
     }
 
     func createInvite(name: String) {
@@ -414,6 +439,11 @@ final class RelayStore {
             guard let e = decode(PairCodeEvent.self, data) else { return }
             if let url = e.relayUrl { agentFacingURL = url }
             pairCode = e.code
+
+        case "claude_code":
+            guard let e = decode(PairCodeEvent.self, data) else { return }
+            if let url = e.relayUrl { agentFacingURL = url }
+            claudeCode = e.code
 
         case "gateway_token":
             guard let e = decode(GatewayTokenEvent.self, data) else { return }

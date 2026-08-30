@@ -5,6 +5,7 @@ struct InboxView: View {
     @State private var path: [Route] = []
     @State private var showingSettings = false
     @State private var showingConnect = false
+    @State private var showingConnectClaude = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -50,6 +51,11 @@ struct InboxView: View {
                         } label: {
                             Label("Connect Hermes", systemImage: "desktopcomputer")
                         }
+                        Button {
+                            showingConnectClaude = true
+                        } label: {
+                            Label("Connect Claude", systemImage: "terminal")
+                        }
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -62,6 +68,7 @@ struct InboxView: View {
             .onChange(of: store.threads.count) { prunePath() }
             .sheet(isPresented: $showingSettings) { SetupView() }
             .sheet(isPresented: $showingConnect) { ConnectHermesView() }
+            .sheet(isPresented: $showingConnectClaude) { ConnectClaudeView() }
         }
     }
 

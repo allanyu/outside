@@ -18,6 +18,7 @@
 		7C56541BC4EA9D15751B23E2 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 949F491DFCCCD797044CD8B5 /* InboxView.swift */; };
 		7E6F7F224AFFA95E348367BE /* ConnectHermesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769412CC283E0589B3BA254F /* ConnectHermesView.swift */; };
 		83D8E8E6F602740A9EA60FE1 /* ApprovalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB4896D91023D800165B625 /* ApprovalCard.swift */; };
+		AA0BFD8270C7D4C88692F5D5 /* ConnectClaudeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220A749AAD5012CDA18320DC /* ConnectClaudeView.swift */; };
 		ABD81D56DC4E9DCB97EF7ECF /* ThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B34819FA2F847C79CA6915B /* ThreadView.swift */; };
 		BA34C40806ABF294F8CD4671 /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A171D822BA125D3D25E2160A /* MessageRow.swift */; };
 		DFF925C0376761543C702F86 /* AgentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EE09788A26E16E57810E8D1 /* AgentDetailView.swift */; };
@@ -28,6 +29,7 @@
 		0BD5C962D52184334A18D0E5 /* Composer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Composer.swift; sourceTree = "<group>"; };
 		1E51B677C02B7214828261ED /* RelayStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayStore.swift; sourceTree = "<group>"; };
 		1EB4896D91023D800165B625 /* ApprovalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalCard.swift; sourceTree = "<group>"; };
+		220A749AAD5012CDA18320DC /* ConnectClaudeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectClaudeView.swift; sourceTree = "<group>"; };
 		2B34819FA2F847C79CA6915B /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
 		65BC8F3C2CAD41A3D729B078 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		769412CC283E0589B3BA254F /* ConnectHermesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectHermesView.swift; sourceTree = "<group>"; };
@@ -81,6 +83,7 @@
 				8EE09788A26E16E57810E8D1 /* AgentDetailView.swift */,
 				1EB4896D91023D800165B625 /* ApprovalCard.swift */,
 				0BD5C962D52184334A18D0E5 /* Composer.swift */,
+				220A749AAD5012CDA18320DC /* ConnectClaudeView.swift */,
 				769412CC283E0589B3BA254F /* ConnectHermesView.swift */,
 				949F491DFCCCD797044CD8B5 /* InboxView.swift */,
 				B960D10E9692F8A5A19E45A3 /* InviteView.swift */,
@@ -167,6 +170,7 @@
 				83D8E8E6F602740A9EA60FE1 /* ApprovalCard.swift in Sources */,
 				16A089BAC1D08DABCDD9A006 /* Composer.swift in Sources */,
 				3A6C6B34F55051578A989344 /* Config.swift in Sources */,
+				AA0BFD8270C7D4C88692F5D5 /* ConnectClaudeView.swift in Sources */,
 				7E6F7F224AFFA95E348367BE /* ConnectHermesView.swift in Sources */,
 				7C56541BC4EA9D15751B23E2 /* InboxView.swift in Sources */,
 				2B87C244C0EE81EF7EA2DD58 /* InviteView.swift in Sources */,

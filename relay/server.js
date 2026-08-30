@@ -157,6 +157,14 @@ function mintAgent({
   return final;
 }
 
+/** A short, readable stand-in for a connect token. Single use, 15 minutes. */
+function newPairCode(accountId, token) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (const b of crypto.randomBytes(6)) code += alphabet[b % alphabet.length];
+  return db.createPairCode({ code, account_id: accountId, token, ttlMs: 15 * 60 * 1000 });
+}
+
 function ensureDm(agentId) {
   const existing = db.findDm(agentId);
   if (existing) return { thread: existing, created: false };
@@ -284,6 +292,19 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 /** A page to open on the machine where the agent runs. */
 app.get("/setup", (_req, res) => {
   res.sendFile(path.join(import.meta.dirname, "setup.html"));
+});
+
+/** A page for setting up Claude Code, rather than a Hermes gateway. */
+app.get("/setup-claude", (_req, res) => {
+  res.sendFile(path.join(import.meta.dirname, "setup-claude.html"));
+});
+
+/** The one-line Claude Code setup script. */
+app.get("/claude.sh", (_req, res) => {
+  const script = fs
+    .readFileSync(path.join(import.meta.dirname, "claude.sh.txt"), "utf8")
+    .replaceAll("{{RELAY}}", publicUrl());
+  res.type("text/plain").send(script);
 });
 
 /** The one-line setup script, with this relay's own address baked in. */
@@ -839,7 +860,7 @@ function handleAppMessage(ws, msg) {
     case "pair_code": {
       let gateway = db
         .listAgents(accountId)
-        .find((a) => !a.profile && a.connect_token);
+        .find((a) => a.is_credential && a.connect_token);
       if (!gateway) {
         gateway = mintAgent({
           name: "gateway",
@@ -848,15 +869,7 @@ function handleAppMessage(ws, msg) {
         });
       }
 
-      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-      let code = "";
-      for (const b of crypto.randomBytes(6)) code += alphabet[b % alphabet.length];
-      const created = db.createPairCode({
-        code,
-        account_id: accountId,
-        token: gateway.connect_token,
-        ttlMs: 15 * 60 * 1000,
-      });
+      const created = newPairCode(accountId, gateway.connect_token);
       sendJson(ws, {
         type: "pair_code",
         code: created.code,
@@ -866,10 +879,32 @@ function handleAppMessage(ws, msg) {
       break;
     }
 
+    // Claude Code is not a Hermes profile, so it is not one of the chats the
+    // gateway mirrors -- it is its own agent with its own chat, and its own
+    // credential to connect with.
+    case "claude_code": {
+      let claude = db
+        .listAgents(accountId)
+        .find((a) => !a.is_credential && !a.profile && !a.host_id && a.connect_token);
+      if (!claude) {
+        claude = mintAgent({
+          name: "claude",
+          avatar_emoji: "\u{1F916}",
+          account_id: accountId,
+        });
+      }
+      sendJson(ws, {
+        type: "claude_code",
+        code: newPairCode(accountId, claude.connect_token).code,
+        relay_url: publicUrl(),
+      });
+      break;
+    }
+
     case "gateway_token": {
       let gateway = db
         .listAgents(accountId)
-        .find((a) => !a.profile && a.connect_token);
+        .find((a) => a.is_credential && a.connect_token);
       if (!gateway) {
         gateway = mintAgent({
           name: "gateway",

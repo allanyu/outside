@@ -1,0 +1,70 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect Claude Code — Agent Inbox</title>
+<style>
+  :root { color-scheme: light dark; --fg:#111; --dim:#666; --line:#e5e5e5; --card:#fff; --bg:#fafafa; --accent:#2e66e5; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg:#f2f2f2; --dim:#9a9a9a; --line:#2a2a2a; --card:#161616; --bg:#0e0e0e; --accent:#7aa2ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:48px 20px; background:var(--bg); color:var(--fg);
+         font:16px/1.55 ui-sans-serif,-apple-system,system-ui,sans-serif; }
+  main { max-width: 620px; margin: 0 auto; }
+  h1 { font-size: 28px; margin: 0 0 8px; letter-spacing:-.02em; }
+  p.lede { color: var(--dim); margin: 0 0 32px; }
+  ol { list-style: none; counter-reset: s; padding: 0; margin: 0; }
+  li { counter-increment: s; background: var(--card); border: 1px solid var(--line);
+       border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; }
+  li h2 { font-size: 16px; margin: 0 0 6px; display: flex; align-items: baseline; gap: 10px; }
+  li h2::before { content: counter(s); color: var(--dim); font-variant-numeric: tabular-nums;
+                  font-weight: 600; font-size: 13px; }
+  li p { margin: 0; color: var(--dim); font-size: 14px; }
+  .btn { display:inline-block; margin-top:14px; padding:11px 18px; border-radius:10px;
+         background: var(--accent); color:#fff; text-decoration:none; font-weight:600; font-size:15px; }
+  code, .code { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .code { display:block; margin-top:12px; padding:12px 14px; background: var(--bg);
+          border:1px solid var(--line); border-radius:10px; overflow-x:auto; white-space:pre; }
+  .token { font: 600 22px/1 ui-monospace, Menlo, monospace; letter-spacing:.12em; margin-top:12px; }
+  .muted { color: var(--dim); font-size: 13px; margin-top: 28px; }
+  button.copy { margin-top:10px; padding:7px 12px; font-size:13px; border-radius:8px;
+                border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+</style>
+<main>
+  <h1>Connect Claude Code</h1>
+  <p class="lede">Do this on the Mac where Claude Code is installed. One command.</p>
+  <ol>
+    <li>
+      <h2>Open a terminal in the folder you want Claude to work in</h2>
+      <p>Claude Code runs where you start it: that folder is the code it reads and the <code>CLAUDE.md</code> it obeys. A repo is the usual answer.</p>
+      <span class="code">cd ~/your-project</span>
+    </li>
+    <li>
+      <h2>Run this</h2>
+      <p>Downloads the adapter, pairs it to your account, and leaves it running. The code works once and expires after 15 minutes — reopen this page from the app for a fresh one.</p>
+      <span class="code" id="cmd">—</span>
+      <button class="copy" data-target="cmd">Copy command</button>
+    </li>
+    <li>
+      <h2>Sign in to Claude Code, if you have not</h2>
+      <p>The adapter runs the <code>claude</code> command as you. If your login has expired, the chat will say so instead of answering — run <code>claude</code> once in a terminal to fix it.</p>
+    </li>
+  </ol>
+  <p class="muted">A chat called <strong>claude</strong> appears in Agent Inbox within a few seconds. It keeps one Claude Code session per chat, so the conversation carries over between messages.</p>
+</main>
+<script>
+  const params = new URLSearchParams(location.search);
+  const code = params.get("code");
+  document.getElementById("cmd").textContent =
+    `curl -fsSL ${location.origin}/claude.sh | sh -s ${code || "YOUR-CODE"}`;
+  for (const b of document.querySelectorAll("button.copy")) {
+    b.onclick = async () => {
+      await navigator.clipboard.writeText(
+        document.getElementById(b.dataset.target).textContent
+      );
+      const was = b.textContent;
+      b.textContent = "Copied";
+      setTimeout(() => (b.textContent = was), 1200);
+    };
+  }
+</script>

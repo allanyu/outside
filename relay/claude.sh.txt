@@ -1,0 +1,85 @@
+#!/usr/bin/env sh
+# Connects Claude Code on this machine to Agent Inbox.
+#
+#   cd ~/your-project
+#   curl -fsSL {{RELAY}}/claude.sh | sh -s YOUR-CODE
+#
+# Claude Code runs in whatever directory you run this from -- that is the
+# repo it reads, and the CLAUDE.md it obeys. The code is single-use and
+# expires after 15 minutes.
+set -eu
+
+CODE="${1:-}"
+RELAY="{{RELAY}}"
+WORKDIR="$(pwd)"
+INSTALL_DIR="$HOME/.agent-inbox/claude-code"
+
+if [ -z "$CODE" ]; then
+  echo "usage: curl -fsSL $RELAY/claude.sh | sh -s YOUR-CODE" >&2
+  exit 1
+fi
+
+command -v node >/dev/null 2>&1 || {
+  echo "Node is not installed on this machine (no 'node' on PATH)." >&2
+  echo "Install it from https://nodejs.org and run this again." >&2
+  exit 1
+}
+command -v claude >/dev/null 2>&1 || {
+  echo "Claude Code is not installed on this machine (no 'claude' on PATH)." >&2
+  exit 1
+}
+
+echo "Pairing..."
+RESPONSE=$(curl -fsS -X POST "$RELAY/api/pair" \
+  -H 'Content-Type: application/json' \
+  -d "{\"code\":\"$CODE\"}") || {
+    echo "That code was not accepted. Codes are single-use and expire after 15 minutes." >&2
+    exit 1
+  }
+
+TOKEN=$(printf '%s' "$RESPONSE" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+[ -n "$TOKEN" ] || { echo "The relay did not return a token." >&2; exit 1; }
+
+echo "Installing the adapter into $INSTALL_DIR..."
+mkdir -p "$INSTALL_DIR"
+for f in index.js client.js env.js package.json; do
+  curl -fsSL "https://raw.githubusercontent.com/allanyu/outside/main/adapters/claude-code/$f" \
+    -o "$INSTALL_DIR/$f" || {
+      echo "Could not download $f from GitHub." >&2
+      exit 1
+    }
+done
+
+( cd "$INSTALL_DIR" && npm install --silent --no-fund --no-audit >/dev/null 2>&1 ) || {
+  echo "npm install failed in $INSTALL_DIR." >&2
+  exit 1
+}
+
+cat > "$INSTALL_DIR/.env" <<EOF
+RELAY_URL=$RELAY
+RELAY_TOKEN=$TOKEN
+WORKDIR=$WORKDIR
+TIMEOUT=300
+EOF
+chmod 600 "$INSTALL_DIR/.env"
+
+# Detached, and its own session: started from a curl | sh pipe, the adapter
+# would otherwise die with the shell that launched it the moment the pipe
+# closes -- which looks like a setup that worked and then quietly stopped.
+echo "Starting it..."
+pkill -f "$INSTALL_DIR/index.js" >/dev/null 2>&1 || true
+( cd "$INSTALL_DIR" && nohup node "$INSTALL_DIR/index.js" > "$INSTALL_DIR/log.txt" 2>&1 & )
+
+sleep 3
+if pgrep -f "$INSTALL_DIR/index.js" >/dev/null 2>&1; then
+  echo
+  echo "Done. Claude is now a chat in Agent Inbox, working in:"
+  echo "  $WORKDIR"
+  echo
+  echo "Log:  $INSTALL_DIR/log.txt"
+  echo "Stop: pkill -f $INSTALL_DIR/index.js"
+else
+  echo "It did not stay running. Last output:" >&2
+  tail -20 "$INSTALL_DIR/log.txt" >&2
+  exit 1
+fi
