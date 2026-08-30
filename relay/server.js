@@ -131,6 +131,8 @@ function mintAgent({
     host_id: host?.id ?? null,
     profile: host ? profile : null,
     account_id,
+    // Getting no chat is what makes this a credential rather than a bot.
+    is_credential: createChat ? 0 : 1,
   });
 
   if (createChat) {
@@ -697,9 +699,13 @@ appWss.on("connection", (ws) => {
   // Accounts created before the credential stopped making a chat still have
   // one. It is not a conversation, so drop it rather than leaving it sitting
   // at the top of an otherwise empty inbox.
+  //
+  // Read the recorded flag, never the shape. A standalone adapter also has a
+  // connect token and neither profile nor host, so inferring it from that
+  // deleted the chat of every agent that was not a gateway -- on each app
+  // connect, which made it look like the adapter had never worked at all.
   for (const a of db.listAgents(ws.accountId)) {
-    const isCredential = a.connect_token && !a.profile && !a.host_id;
-    if (!isCredential) continue;
+    if (!a.is_credential) continue;
     const dm = db.findDm(a.id);
     if (dm) {
       db.deleteThread(dm.id);

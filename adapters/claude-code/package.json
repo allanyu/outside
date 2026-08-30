@@ -1,0 +1,14 @@
+{
+  "name": "agent-inbox-claude-code-adapter",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Runs Claude Code as one Agent Inbox bot. One chat, one Claude Code session.",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

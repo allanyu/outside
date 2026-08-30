@@ -118,6 +118,22 @@ export function openDb(dataDir) {
   if (!columns.includes("available_profiles")) {
     db.exec("ALTER TABLE agents ADD COLUMN available_profiles TEXT");
   }
+  // A credential is an agent that exists only to carry a connect token -- the
+  // one a Hermes gateway signs in with. It is not a conversation and gets no
+  // chat. Recorded explicitly because it cannot be inferred: a standalone
+  // agent has its own connect token too, and guessing from that shape deleted
+  // the chats of every adapter that was not a gateway.
+  if (!columns.includes("is_credential")) {
+    db.exec("ALTER TABLE agents ADD COLUMN is_credential INTEGER NOT NULL DEFAULT 0");
+    // Existing credentials predate the column. They are the ones mintAgent
+    // named "gateway"; matching on the name keeps the backfill off adapters,
+    // which the owner names themselves.
+    db.exec(
+      `UPDATE agents SET is_credential = 1
+        WHERE connect_token IS NOT NULL AND profile IS NULL AND host_id IS NULL
+          AND (name = 'gateway' OR name LIKE 'gateway-%')`
+    );
+  }
   const accountCols = db.prepare("PRAGMA table_info(accounts)").all().map((c) => c.name);
   if (!accountCols.includes("apple_sub")) {
     db.exec("ALTER TABLE accounts ADD COLUMN apple_sub TEXT");
@@ -295,11 +311,15 @@ export function createAgentWithToken({
   host_id = null,
   profile = null,
   account_id,
+  is_credential = 0,
 }) {
   db.prepare(
-    `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, connect_token, host_id, profile, account_id)
-     VALUES (?, ?, ?, 'offline', 0, ?, ?, ?, ?)`
-  ).run(id, name, avatar_emoji, connect_token, host_id, profile, account_id);
+    `INSERT INTO agents (id, name, avatar_emoji, status, last_seen, connect_token, host_id, profile, account_id, is_credential)
+     VALUES (?, ?, ?, 'offline', 0, ?, ?, ?, ?, ?)`
+  ).run(
+    id, name, avatar_emoji, connect_token, host_id, profile, account_id,
+    is_credential ? 1 : 0
+  );
   return getAgent(id);
 }
 
