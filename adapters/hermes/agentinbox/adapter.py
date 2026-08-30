@@ -75,6 +75,10 @@ class AgentInboxAdapter(BasePlatformAdapter):
         self._watcher: Optional[asyncio.Task] = None
         self._closing = False
         self._reported_profiles: List[str] = []
+        # (chat, text) -> when it was sent. Hermes warns about this itself
+        # ("possible duplicate send"): the final send is not always suppressed
+        # when a stream consumer delivered nothing, and both reach us.
+        self._recent_sends: Dict[str, float] = {}
         self._threads: Dict[str, Dict[str, Any]] = {}
         # Agents the app created under this one. They have no connection of
         # their own -- this socket carries them, so adding one in the app needs
@@ -442,6 +446,18 @@ class AgentInboxAdapter(BasePlatformAdapter):
         if "No home channel is set" in content:
             logger.debug("[AgentInbox] suppressed the home-channel prompt")
             return SendResult(success=True)
+
+        now = asyncio.get_event_loop().time()
+        fingerprint = f"{chat_id}\n{content}"
+        last = self._recent_sends.get(fingerprint)
+        if last is not None and now - last < 8.0:
+            logger.info("[AgentInbox] dropped a repeat of the same reply")
+            return SendResult(success=True)
+        self._recent_sends[fingerprint] = now
+        # Keep the table small; anything older cannot be a duplicate.
+        for key, when in list(self._recent_sends.items()):
+            if now - when > 30.0:
+                self._recent_sends.pop(key, None)
 
         # Answer as whichever identity was addressed in this thread.
         identity = self._identity_for_thread.get(chat_id, self.agent_id)

@@ -160,6 +160,16 @@ export function adoptOrphans(accountId) {
   return { agents, threads };
 }
 
+export function renameAccount(id, name) {
+  db.prepare("UPDATE accounts SET name = ? WHERE id = ?").run(name, id);
+  return getAccount(id);
+}
+
+export function promoteToOwner(id) {
+  db.prepare("UPDATE accounts SET is_owner = 1 WHERE id = ?").run(id);
+  return getAccount(id);
+}
+
 export function retokenAccount(id, token) {
   db.prepare("UPDATE accounts SET token = ? WHERE id = ?").run(token, id);
 }

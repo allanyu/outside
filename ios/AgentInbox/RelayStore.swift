@@ -129,6 +129,14 @@ final class RelayStore {
         }
     }
 
+    /// Your display name on this relay. It is what an invite is attributed to
+    /// and how you are identified on this account.
+    func setProfileName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        send(["type": "set_profile", "name": trimmed])
+    }
+
     func createInvite(name: String) {
         lastInvite = nil
         send(["type": "create_invite", "name": name])
@@ -224,6 +232,7 @@ final class RelayStore {
         let account: Account?
     }
     private struct InviteEvent: Decodable { let invite: Invite; let relayUrl: String? }
+    private struct AccountEvent: Decodable { let account: Account }
     private struct AgentRemovedEvent: Decodable { let agentId: String; let threadIds: [String] }
     private struct MessageEvent: Decodable { let message: Message }
     private struct StatusEvent: Decodable {
@@ -292,6 +301,9 @@ final class RelayStore {
             } else {
                 approvals.append(e.approval)
             }
+
+        case "account":
+            account = decode(AccountEvent.self, data)?.account
 
         case "invite":
             guard let e = decode(InviteEvent.self, data) else { return }

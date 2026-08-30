@@ -277,10 +277,14 @@ app.post("/api/join", (req, res) => {
   if (!invite) return res.status(404).json({ error: "no such invite" });
   if (invite.claimed_by) return res.status(409).json({ error: "invite already used" });
 
+  // The bootstrap invite belongs to whoever set the relay up, so claiming it
+  // makes that person the owner rather than a guest.
+  const isBootstrap = invite.name === "bootstrap";
   const account = db.createAccount({
     id: uid(),
-    name: name || invite.name || "Guest",
+    name: name || (isBootstrap ? "Owner" : invite.name) || "Guest",
     token: secret("acct"),
+    is_owner: isBootstrap ? 1 : 0,
   });
   db.claimInvite(code, account.id);
   log(`invite ${code} claimed -> account ${account.name}`);
@@ -670,6 +674,21 @@ function handleAppMessage(ws, msg) {
       });
       break;
     }
+    case "set_profile": {
+      const name = String(msg.name || "").trim().slice(0, 40);
+      if (!name) throw new Error("name required");
+      const updated = db.renameAccount(accountId, name);
+      toApp(accountId, {
+        type: "account",
+        account: {
+          id: updated.id,
+          name: updated.name,
+          is_owner: !!updated.is_owner,
+        },
+      });
+      break;
+    }
+
     // Invite someone else onto this relay. They get their own account: their
     // own agents, their own threads, no sight of yours.
     case "create_invite": {

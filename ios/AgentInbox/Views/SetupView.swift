@@ -10,6 +10,7 @@ struct SetupView: View {
     @State private var token: String = ""
     @State private var inviteCode: String = ""
     @State private var joining = false
+    @State private var profileName: String = ""
 
     private var canConnect: Bool {
         !url.trimmingCharacters(in: .whitespaces).isEmpty
@@ -76,9 +77,23 @@ struct SetupView: View {
 
                 if !isFirstRun {
                     Section {
-                        if let account = store.account {
-                            LabeledContent("Signed in as", value: account.name)
-                        }
+                        TextField("Your name", text: $profileName)
+                            .autocorrectionDisabled()
+                            .onSubmit { store.setProfileName(profileName) }
+                        Button("Save name") { store.setProfileName(profileName) }
+                            .disabled(
+                                profileName.trimmingCharacters(in: .whitespaces).isEmpty
+                                    || profileName == store.account?.name
+                            )
+                    } header: {
+                        Text("You")
+                    } footer: {
+                        Text(store.account?.isOwner == true
+                             ? "You set this relay up, so you can invite other people onto it."
+                             : "Only you can see your chats. Other people on this relay have their own.")
+                    }
+
+                    Section {
                         ConnectionRow()
                         Button("Disconnect", role: .destructive) {
                             store.signOut()
@@ -105,6 +120,10 @@ struct SetupView: View {
             .onAppear {
                 url = store.relayURL.isEmpty ? Config.defaultRelayURL : store.relayURL
                 token = store.token
+                profileName = store.account?.name ?? ""
+            }
+            .onChange(of: store.account?.name) { _, name in
+                if let name, profileName.isEmpty { profileName = name }
             }
         }
     }
