@@ -155,9 +155,21 @@ struct SetupView: View {
                 .joined(separator: " ")
             Task { await store.signInWithApple(identityToken: identityToken, fullName: name) }
         case .failure(let error):
-            // Cancelling is not an error worth showing.
-            if (error as? ASAuthorizationError)?.code == .canceled { return }
-            store.joinError = error.localizedDescription
+            switch (error as? ASAuthorizationError)?.code {
+            case .canceled:
+                // Backing out is not an error worth showing.
+                return
+            case .unknown, .failed:
+                // The usual cause is a build without the entitlement (any
+                // simulator build) or a device not signed in to an Apple ID.
+                store.joinError = """
+                Apple couldn't complete that sign-in. On a simulator this \
+                never works — try it on a real device, and check the device \
+                is signed in to an Apple ID.
+                """
+            default:
+                store.joinError = error.localizedDescription
+            }
         }
     }
 }
