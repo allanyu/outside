@@ -1,0 +1,79 @@
+#!/usr/bin/env sh
+# Connects this machine's Hermes to Agent Inbox.
+#
+#   curl -fsSL {{RELAY}}/connect.sh | sh -s YOUR-CODE
+#
+# It installs the plugin, writes the credential, enables the platform and
+# restarts the gateway. The code is single-use and expires.
+set -eu
+
+CODE="${1:-}"
+RELAY="{{RELAY}}"
+
+if [ -z "$CODE" ]; then
+  echo "usage: curl -fsSL $RELAY/connect.sh | sh -s YOUR-CODE" >&2
+  exit 1
+fi
+
+command -v hermes >/dev/null 2>&1 || {
+  echo "Hermes is not installed on this machine (no 'hermes' on PATH)." >&2
+  exit 1
+}
+
+HOME_DIR="${HERMES_HOME:-$HOME/.hermes}"
+[ -d "$HOME_DIR" ] || { echo "No Hermes at $HOME_DIR." >&2; exit 1; }
+
+echo "Pairing..."
+RESPONSE=$(curl -fsS -X POST "$RELAY/api/pair" \
+  -H 'Content-Type: application/json' \
+  -d "{\"code\":\"$CODE\"}") || {
+    echo "That code was not accepted. Codes are single-use and expire after 15 minutes." >&2
+    exit 1
+  }
+
+TOKEN=$(printf '%s' "$RESPONSE" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+[ -n "$TOKEN" ] || { echo "The relay did not return a token." >&2; exit 1; }
+
+echo "Installing the plugin..."
+# Already installed is not a failure -- this is meant to be re-runnable.
+hermes plugins install "allanyu/outside/adapters/hermes/agentinbox" </dev/null >/dev/null 2>&1 \
+  || hermes plugins update agentinbox-platform </dev/null >/dev/null 2>&1 \
+  || true
+hermes plugins enable agentinbox-platform </dev/null >/dev/null 2>&1 || true
+
+echo "Writing credentials to $HOME_DIR/.env..."
+ENV_FILE="$HOME_DIR/.env"
+touch "$ENV_FILE"
+grep -v '^AGENTINBOX_' "$ENV_FILE" > "$ENV_FILE.tmp" 2>/dev/null || true
+mv "$ENV_FILE.tmp" "$ENV_FILE"
+{
+  echo "AGENTINBOX_RELAY_URL=$RELAY"
+  echo "AGENTINBOX_TOKEN=$TOKEN"
+  echo "AGENTINBOX_ALLOWED_USERS=user"
+} >> "$ENV_FILE"
+
+echo "Enabling the platform..."
+python3 - "$HOME_DIR" <<'PY' 2>/dev/null || true
+import pathlib, sys
+try:
+    import yaml
+except ImportError:
+    sys.exit(0)
+p = pathlib.Path(sys.argv[1]) / "config.yaml"
+cfg = yaml.safe_load(p.read_text()) if p.is_file() else {}
+cfg = cfg or {}
+cfg.setdefault("platforms", {})["agentinbox"] = {
+    "enabled": True, "dm_policy": "open", "group_policy": "open",
+}
+p.write_text(yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True))
+PY
+
+echo "Starting the gateway..."
+# `hermes gateway restart` does not return -- it becomes the gateway -- so it
+# has to be detached or this script never finishes.
+( nohup hermes gateway restart >/dev/null 2>&1 </dev/null & ) || \
+  echo "  (could not start it automatically — run 'hermes gateway' yourself)"
+sleep 3
+
+echo
+echo "Done. Your bots should appear in Agent Inbox within a few seconds."

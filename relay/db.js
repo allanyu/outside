@@ -24,6 +24,16 @@ export function openDb(dataDir) {
       apple_sub   TEXT UNIQUE
     );
 
+    -- Short-lived codes so the one-line setup command stays typeable. The
+    -- real credential is only handed over when the code is redeemed.
+    CREATE TABLE IF NOT EXISTS pair_codes (
+      code        TEXT PRIMARY KEY,
+      account_id  TEXT NOT NULL,
+      token       TEXT NOT NULL,
+      expires_at  INTEGER NOT NULL,
+      used_at     INTEGER
+    );
+
     CREATE TABLE IF NOT EXISTS invites (
       code         TEXT PRIMARY KEY,
       created_by   TEXT NOT NULL,
@@ -220,6 +230,23 @@ export function listInvites(createdBy) {
   return db
     .prepare("SELECT * FROM invites WHERE created_by = ? ORDER BY created_at DESC")
     .all(createdBy);
+}
+
+/* ---------- pairing ---------- */
+
+export function createPairCode({ code, account_id, token, ttlMs }) {
+  db.prepare(
+    "INSERT INTO pair_codes (code, account_id, token, expires_at) VALUES (?, ?, ?, ?)"
+  ).run(code, account_id, token, now() + ttlMs);
+  return { code, expires_at: now() + ttlMs };
+}
+
+/** Redeem once. Returns null for unknown, used, or expired codes. */
+export function redeemPairCode(code) {
+  const row = db.prepare("SELECT * FROM pair_codes WHERE code = ?").get(code);
+  if (!row || row.used_at || row.expires_at < now()) return null;
+  db.prepare("UPDATE pair_codes SET used_at = ? WHERE code = ?").run(now(), code);
+  return row;
 }
 
 /* ---------- agents ---------- */

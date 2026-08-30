@@ -268,6 +268,27 @@ function requireToken(req, res, next) {
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
+/** The one-line setup script, with this relay's own address baked in. */
+app.get("/connect.sh", (_req, res) => {
+  const script = fs
+    .readFileSync(path.join(import.meta.dirname, "connect.sh.txt"), "utf8")
+    .replaceAll("{{RELAY}}", publicUrl());
+  res.type("text/plain").send(script);
+});
+
+/**
+ * Redeem a pairing code for the account's gateway credential. Single use, and
+ * short-lived -- the code is short enough to type, so it must not be a
+ * long-lived secret.
+ */
+app.post("/api/pair", (req, res) => {
+  const code = String(req.body?.code || "").trim().toUpperCase();
+  const row = db.redeemPairCode(code);
+  if (!row) return res.status(404).json({ error: "unknown or expired code" });
+  log(`paired a backend to account ${row.account_id}`);
+  res.json({ token: row.token, relay_url: publicUrl() });
+});
+
 /**
  * Sign in with Apple. The identity token is the whole credential -- it is
  * verified against Apple's published keys, and its subject is what identifies
@@ -749,6 +770,32 @@ function handleAppMessage(ws, msg) {
     // The credential a backend uses to connect. One per account: whatever
     // connects with it becomes that account's gateway, and the bots it reports
     // become the chats. It is not a chat itself.
+    // A short code standing in for the gateway credential, so setup is one
+    // line someone can read out loud.
+    case "pair_code": {
+      let gateway = db
+        .listAgents(accountId)
+        .find((a) => !a.profile && a.connect_token);
+      if (!gateway) gateway = mintAgent({ name: "gateway", account_id: accountId });
+
+      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (const b of crypto.randomBytes(6)) code += alphabet[b % alphabet.length];
+      const created = db.createPairCode({
+        code,
+        account_id: accountId,
+        token: gateway.connect_token,
+        ttlMs: 15 * 60 * 1000,
+      });
+      sendJson(ws, {
+        type: "pair_code",
+        code: created.code,
+        expires_at: created.expires_at,
+        relay_url: publicUrl(),
+      });
+      break;
+    }
+
     case "gateway_token": {
       let gateway = db
         .listAgents(accountId)
