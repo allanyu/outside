@@ -348,6 +348,7 @@ class AgentInboxAdapter(BasePlatformAdapter):
             if current == self._reported_profiles:
                 continue
             self._reported_profiles = current
+            _ensure_allowlist()
             logger.info(
                 "[AgentInbox] profiles changed: %s",
                 ", ".join(p["display"] for p in current),
@@ -622,6 +623,69 @@ def _is_connected() -> bool:
     return bool(_active and _active.is_connected)
 
 
+ALLOWED_USERS_ENV = "AGENTINBOX_ALLOWED_USERS"
+
+
+def _profile_homes():
+    """Every Hermes home on this machine: the default root and each profile."""
+    from hermes_constants import get_default_hermes_root
+
+    root = get_default_hermes_root()
+    homes = [root]
+    profiles = root / "profiles"
+    if profiles.is_dir():
+        homes += [
+            d for d in sorted(profiles.iterdir()) if (d / "config.yaml").is_file()
+        ]
+    return homes
+
+
+def _ensure_allowlist() -> None:
+    """Allow the app's sender in every profile, so no bot demands pairing.
+
+    A profile's secrets are built from that profile's own ``.env`` with no
+    fallback to the default root, so an allowlist set once in one place leaves
+    every other bot unauthorized. Hermes then answers the first message with a
+    pairing code and a ``hermes -p <bot> pairing approve`` command to run in a
+    terminal — for each bot, forever, on a product whose whole point is that
+    you never open one.
+
+    There is nothing to decide here: the relay hands each account its own
+    token, and every message that arrives over it is from that account's owner
+    under the single id ``user``. Writing the constant is what makes the app's
+    own messages recognized as theirs.
+
+    Absence-only, so a user who narrows the list keeps their edit.
+    """
+    try:
+        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from hermes_cli.config import save_env_value
+    except Exception:
+        logger.debug("[AgentInbox] no Hermes config API for the allowlist", exc_info=True)
+        return
+
+    for home in _profile_homes():
+        try:
+            env_path = home / ".env"
+            if env_path.is_file():
+                already = any(
+                    line.strip().startswith(f"{ALLOWED_USERS_ENV}=")
+                    for line in env_path.read_text(errors="replace").splitlines()
+                )
+                if already:
+                    continue
+            token = set_hermes_home_override(str(home))
+            try:
+                save_env_value(ALLOWED_USERS_ENV, "user")
+            finally:
+                reset_hermes_home_override(token)
+            logger.info("[AgentInbox] allowed the app to talk to '%s'", home.name)
+        except Exception:
+            logger.debug(
+                "[AgentInbox] could not set the allowlist for %s", home, exc_info=True
+            )
+
+
 def _ensure_gateway_config() -> None:
     """Write the two config keys Agent Inbox needs but nobody can click.
 
@@ -691,6 +755,7 @@ def _ensure_gateway_config() -> None:
 def register(ctx) -> None:
     """Plugin entry point — called by the Hermes plugin system."""
     _ensure_gateway_config()
+    _ensure_allowlist()
     ctx.register_platform(
         name=PLATFORM_NAME,
         label="Agent Inbox",
