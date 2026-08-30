@@ -11,8 +11,6 @@ struct SetupView: View {
     var isFirstRun: Bool = false
 
     @State private var profileName = ""
-    @State private var inviteCode = ""
-    @State private var joining = false
     @State private var showingAdvanced = false
     @State private var url = ""
     @State private var token = ""
@@ -27,8 +25,8 @@ struct SetupView: View {
                     you
                     connection
                     signOut
+                    advanced
                 }
-                advanced
                 if let joinError = store.joinError {
                     Section { Text(joinError).font(.footnote).foregroundStyle(.red) }
                 }
@@ -56,40 +54,17 @@ struct SetupView: View {
     // MARK: first run
 
     private var signIn: some View {
-        Group {
-            Section {
-                SignInWithAppleButton(.signIn) { request in
-                    request.requestedScopes = [.fullName]
-                } onCompletion: { handleApple($0) }
-                .signInWithAppleButtonStyle(.black)
-                .frame(height: 48)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-            } header: {
-                Text("Sign in")
-            } footer: {
-                Text("Your chats are yours alone. Nothing is stored about you but the name you choose.")
-            }
-
-            Section {
-                TextField("Invite code", text: $inviteCode)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                Button(joining ? "Joining…" : "Join") {
-                    joining = true
-                    Task {
-                        await store.join(
-                            relayURL: url.isEmpty ? Config.defaultRelayURL : url,
-                            code: inviteCode
-                        )
-                        joining = false
-                    }
-                }
-                .disabled(inviteCode.isEmpty || joining)
-            } header: {
-                Text("Or use an invite")
-            } footer: {
-                Text("Tapping an invite link does this for you.")
-            }
+        Section {
+            SignInWithAppleButton(.signIn) { request in
+                request.requestedScopes = [.fullName]
+            } onCompletion: { handleApple($0) }
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 48)
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+        } header: {
+            Text("Sign in")
+        } footer: {
+            Text("Your chats are yours alone. Nothing is stored about you but the name you choose.")
         }
     }
 
@@ -108,7 +83,7 @@ struct SetupView: View {
         } header: {
             Text("You")
         } footer: {
-            Text("Only you can see your chats. Everyone else on this relay has their own.")
+            Text("Only you can see your chats. Everyone else has their own.")
         }
     }
 
@@ -139,7 +114,7 @@ struct SetupView: View {
     private var advanced: some View {
         Section {
             DisclosureGroup("Advanced", isExpanded: $showingAdvanced) {
-                TextField("Relay address", text: $url)
+                TextField("Server address", text: $url)
                     .textContentType(.URL)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
@@ -158,7 +133,7 @@ struct SetupView: View {
                 )
             }
         } footer: {
-            Text("For pointing at a different relay, or signing in with a token you already have.")
+            Text("For pointing at a different server, or signing in with a token you already have.")
         }
     }
 

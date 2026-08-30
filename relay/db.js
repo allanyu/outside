@@ -304,6 +304,10 @@ export function getAgentByConnectToken(token) {
   );
 }
 
+export function renameThread(threadId, name) {
+  db.prepare("UPDATE threads SET name = ? WHERE id = ?").run(name, threadId);
+}
+
 export function deleteThread(threadId) {
   db.prepare("DELETE FROM messages WHERE thread_id = ?").run(threadId);
   db.prepare("DELETE FROM approvals WHERE thread_id = ?").run(threadId);

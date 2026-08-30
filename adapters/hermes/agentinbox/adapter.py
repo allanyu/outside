@@ -163,11 +163,52 @@ class AgentInboxAdapter(BasePlatformAdapter):
             )
         return names
 
+    def _display_name(self, profile: str) -> str:
+        """What Hermes calls this bot.
+
+        ``display_name`` in the profile's own profile.yaml when it is set --
+        that is where Hermes records a renamed bot. The default profile is
+        Hermes itself and has no folder of its own.
+        """
+        if profile == "default":
+            return "Hermes"
+        home = self._hermes_home / "profiles" / profile
+        meta = home / "profile.yaml"
+        if meta.is_file():
+            try:
+                import yaml
+
+                name = (yaml.safe_load(meta.read_text()) or {}).get("display_name")
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+            except Exception:
+                pass
+
+        # A bot's SOUL.md usually opens with its own name -- "# D Bot" for the
+        # profile d-bot. Take it only when it is the same name written
+        # differently, so a heading that says something else cannot rename the
+        # chat to something the user would not recognise.
+        soul = home / "SOUL.md"
+        if soul.is_file():
+            try:
+                first = soul.read_text(errors="replace").lstrip().splitlines()[0]
+            except Exception:
+                first = ""
+            if first.startswith("#"):
+                heading = first.lstrip("#").strip()
+                squash = lambda t: "".join(c for c in t.lower() if c.isalnum())
+                if heading and squash(heading) == squash(profile):
+                    return heading
+        return profile
+
+    def _profile_list(self) -> List[Dict[str, str]]:
+        return [{"name": p, "display": self._display_name(p)} for p in self._profile_names()]
+
     def _register_frame(self) -> Dict[str, Any]:
         # With a connect token the relay knows who we are, and claiming a
         # different agent_id is rejected. Only name ourselves when connecting
         # with the shared relay token.
-        self._reported_profiles = self._profile_names()
+        self._reported_profiles = self._profile_list()
         frame: Dict[str, Any] = {"type": "register", "profiles": self._reported_profiles}
         if self._uses_connect_token:
             return frame
@@ -217,13 +258,16 @@ class AgentInboxAdapter(BasePlatformAdapter):
             if self._closing:
                 return
             try:
-                current = self._profile_names()
+                current = self._profile_list()
             except Exception:
                 continue
             if current == self._reported_profiles:
                 continue
             self._reported_profiles = current
-            logger.info("[AgentInbox] profiles changed: %s", ", ".join(current))
+            logger.info(
+                "[AgentInbox] profiles changed: %s",
+                ", ".join(p["display"] for p in current),
+            )
             try:
                 await self._send_json({"type": "profiles", "profiles": current})
             except Exception:

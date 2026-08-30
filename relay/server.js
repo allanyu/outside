@@ -490,26 +490,38 @@ function registerAgent({ agent_id, name, avatar_emoji, online, account_id, isTra
  * created and deleted on the backend; the app only mirrors them.
  */
 function syncProfiles(connectionId, profiles, accountId) {
+  // Either bare names or {name, display}. The display name is what the
+  // backend calls the bot, and it is what the chat should be called.
   const wanted = new Map(
-    (profiles ?? []).map((name) => [slugify(name), String(name)])
+    (profiles ?? []).map((p) => {
+      const name = typeof p === "string" ? p : String(p?.name ?? "");
+      const display = typeof p === "string" ? p : String(p?.display || p?.name || "");
+      return [slugify(name), { name, display: display || name }];
+    })
   );
 
-  for (const [id, profileName] of wanted) {
+  for (const [id, { name: profileName, display }] of wanted) {
     const existing = db.getAgent(id);
     if (existing) {
       db.setAgentHost(id, connectionId);
       db.setAgentStatus(id, "online");
+      // The bot may have been renamed on the backend.
+      if (existing.name !== display) {
+        db.upsertAgent({ id, name: display });
+        const dm = db.findDm(id);
+        if (dm) db.renameThread(dm.id, display);
+      }
     } else {
       db.createAgentWithToken({
         id,
-        name: profileName,
+        name: display,
         avatar_emoji: "🤖",
         connect_token: null,
         host_id: connectionId,
         profile: profileName,
         account_id: accountId,
       });
-      log(`chat added for profile '${profileName}'`);
+      log(`chat added for '${display}'`);
     }
     const { thread, created } = ensureDm(id);
     if (created) {
