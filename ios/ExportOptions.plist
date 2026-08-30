@@ -10,5 +10,18 @@
 	<true/>
 	<key>destination</key>
 	<string>export</string>
+	<!-- No Apple ID is signed in to Xcode here, so automatic signing has no
+	     account to mint a distribution certificate or profile from. Both were
+	     created through the App Store Connect API instead and are named
+	     explicitly, which is what lets the export run without one. -->
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.allanyu.agentinbox</key>
+		<string>AgentInbox App Store</string>
+	</dict>
 </dict>
 </plist>
