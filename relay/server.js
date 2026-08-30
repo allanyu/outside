@@ -98,7 +98,16 @@ function slugify(name) {
  * The name doubles as the @handle that mention routing matches on, so it has
  * to be unique -- two agents called "hermes" would both answer to @hermes.
  */
-function mintAgent({ name, avatar_emoji, host_agent_id = null, profile = null, account_id }) {
+function mintAgent({
+  name,
+  avatar_emoji,
+  host_agent_id = null,
+  profile = null,
+  account_id,
+  // A credential a backend connects with is not a conversation. Without this
+  // the gateway shows up in the inbox as a chat nobody can talk to.
+  createChat = true,
+}) {
   const base = slugify(name);
   const taken = (handle) =>
     db.getAgent(handle) ||
@@ -124,9 +133,11 @@ function mintAgent({ name, avatar_emoji, host_agent_id = null, profile = null, a
     account_id,
   });
 
-  const { thread, created } = ensureDm(handle);
-  if (created) {
-    toApp(account_id, { type: "thread", thread: threadPayload(thread.id) });
+  if (createChat) {
+    const { thread, created } = ensureDm(handle);
+    if (created) {
+      toApp(account_id, { type: "thread", thread: threadPayload(thread.id) });
+    }
   }
 
   // The host is already connected, so the new agent is live immediately.
@@ -781,7 +792,13 @@ function handleAppMessage(ws, msg) {
       let gateway = db
         .listAgents(accountId)
         .find((a) => !a.profile && a.connect_token);
-      if (!gateway) gateway = mintAgent({ name: "gateway", account_id: accountId });
+      if (!gateway) {
+        gateway = mintAgent({
+          name: "gateway",
+          account_id: accountId,
+          createChat: false,
+        });
+      }
 
       const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
       let code = "";
@@ -806,7 +823,11 @@ function handleAppMessage(ws, msg) {
         .listAgents(accountId)
         .find((a) => !a.profile && a.connect_token);
       if (!gateway) {
-        gateway = mintAgent({ name: "gateway", account_id: accountId });
+        gateway = mintAgent({
+          name: "gateway",
+          account_id: accountId,
+          createChat: false,
+        });
       }
       sendJson(ws, {
         type: "gateway_token",
