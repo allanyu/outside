@@ -664,6 +664,19 @@ server.on("upgrade", (req, socket, head) => {
 appWss.on("connection", (ws) => {
   appSockets.add(ws);
   const account = db.getAccount(ws.accountId);
+
+  // Accounts created before the credential stopped making a chat still have
+  // one. It is not a conversation, so drop it rather than leaving it sitting
+  // at the top of an otherwise empty inbox.
+  for (const a of db.listAgents(ws.accountId)) {
+    const isCredential = a.connect_token && !a.profile && !a.host_id;
+    if (!isCredential) continue;
+    const dm = db.findDm(a.id);
+    if (dm) {
+      db.deleteThread(dm.id);
+      log(`removed a stale gateway chat from ${account?.name ?? "an account"}`);
+    }
+  }
   log(`app connected: ${account?.name ?? "?"} (${appSockets.size} total)`);
 
   const threads = db.listThreads(ws.accountId);

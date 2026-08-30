@@ -13,3 +13,4 @@ DerivedData/
 build/
 *.xcuserstate
 *.xcscmblueprint
+__pycache__/

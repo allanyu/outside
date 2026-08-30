@@ -3,9 +3,9 @@ label: Agent Inbox
 kind: platform
 version: 0.1.0
 description: >
-  Agent Inbox gateway adapter. Connects Hermes to an Agent Inbox relay over
-  /ws/agent and relays messages between relay threads (DMs and groups) and the
-  Hermes agent, so sessions and memory live in Hermes.
+  Agent Inbox gateway adapter. Connects Hermes to the Agent Inbox relay so you
+  can chat with your bots from the iOS app. Every Hermes profile becomes one
+  chat; sessions and memory stay in Hermes.
 author: agent-inbox
 requires_env:
   - name: AGENTINBOX_RELAY_URL

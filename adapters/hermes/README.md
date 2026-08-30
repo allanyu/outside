@@ -60,13 +60,14 @@ With a connect token the name and emoji come from the app. With the shared
 
 ## One gateway, every bot
 
-The adapter reports its Hermes profiles to the relay on connect, so they appear
-in the app under **New Agent → Runs on → Bot**. Picking one stamps
-``SessionSource.profile`` on every message for that agent, which is what routes
-the turn to that profile's session, memory and prompt.
+The adapter reports its Hermes profiles to the relay on connect, and the app
+shows one chat per profile. Each message carries ``SessionSource.profile``,
+which routes the turn to that profile's session, memory and prompt.
 
-Set ``gateway.multiplex_profiles: true`` in ``~/.hermes/config.yaml`` for this
-to work — profile-scoped session keys are gated on it.
+Profile-scoped session keys are gated on ``gateway.multiplex_profiles``, and
+Hermes exposes no UI for that flag, so ``register()`` sets it in the default
+profile's ``config.yaml`` on first load. It takes effect on the next gateway
+start — which is the restart that saving your credentials already triggers.
 
 One gateway process therefore backs every bot you have. Do **not** also run
 ``hermes -p <name> gateway`` for the same profile: two adapters registering the

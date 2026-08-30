@@ -538,8 +538,53 @@ def _is_connected() -> bool:
     return bool(_active and _active.is_connected)
 
 
+def _ensure_multiplex_profiles() -> None:
+    """Turn on ``gateway.multiplex_profiles`` in the default profile's config.
+
+    Every Hermes profile is a bot, and the app shows one chat per profile. But
+    without multiplexing the gateway only ever serves the default profile, so
+    ``source.profile`` is ignored and every bot answers as the default one.
+
+    There is no UI anywhere in Hermes for this flag — not Settings, not the
+    desktop app — so leaving it to the user means hand-editing config.yaml,
+    which a beta tester cannot be asked to do. The plugin sets it for them.
+
+    Idempotent and fail-open: only writes when the flag is absent or falsy, and
+    never blocks registration. Writes to the DEFAULT root, since that is the
+    profile whose gateway becomes the multiplexer.
+    """
+    try:
+        from hermes_constants import get_default_hermes_root
+        from hermes_cli.config import atomic_config_write, read_user_config_raw
+
+        cfg_path = get_default_hermes_root() / "config.yaml"
+        if not cfg_path.exists():
+            return
+
+        cfg = read_user_config_raw(cfg_path)
+        # Hermes accepts the flag either top-level or nested under `gateway`.
+        if cfg.get("multiplex_profiles") or (cfg.get("gateway") or {}).get(
+            "multiplex_profiles"
+        ):
+            return
+
+        gateway_cfg = cfg.get("gateway")
+        if not isinstance(gateway_cfg, dict):
+            gateway_cfg = {}
+        gateway_cfg["multiplex_profiles"] = True
+        cfg["gateway"] = gateway_cfg
+        atomic_config_write(cfg_path, cfg, sort_keys=False)
+        logger.info(
+            "[AgentInbox] enabled gateway.multiplex_profiles so every Hermes "
+            "profile gets its own chat; takes effect on the next gateway start"
+        )
+    except Exception:
+        logger.debug("[AgentInbox] could not set multiplex_profiles", exc_info=True)
+
+
 def register(ctx) -> None:
     """Plugin entry point — called by the Hermes plugin system."""
+    _ensure_multiplex_profiles()
     ctx.register_platform(
         name=PLATFORM_NAME,
         label="Agent Inbox",
