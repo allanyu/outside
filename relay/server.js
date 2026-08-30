@@ -836,6 +836,14 @@ function handleAgentMessage(ws, msg) {
       break;
     }
 
+    // The backend's bot list changed while connected.
+    case "profiles": {
+      if (!Array.isArray(msg.profiles)) break;
+      db.setAgentProfiles(connectionId, msg.profiles);
+      syncProfiles(connectionId, msg.profiles, ws.accountId);
+      break;
+    }
+
     // Ephemeral: shown in the app until a real message lands, never stored.
     case "status": {
       toApp(accountOfThread(msg.thread_id), {

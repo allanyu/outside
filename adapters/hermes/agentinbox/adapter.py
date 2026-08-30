@@ -72,7 +72,9 @@ class AgentInboxAdapter(BasePlatformAdapter):
 
         self._ws: Optional[Any] = None
         self._reader: Optional[asyncio.Task] = None
+        self._watcher: Optional[asyncio.Task] = None
         self._closing = False
+        self._reported_profiles: List[str] = []
         self._threads: Dict[str, Dict[str, Any]] = {}
         # Agents the app created under this one. They have no connection of
         # their own -- this socket carries them, so adding one in the app needs
@@ -119,12 +121,16 @@ class AgentInboxAdapter(BasePlatformAdapter):
 
         await self._send_json(self._register_frame())
         self._reader = asyncio.create_task(self._read_loop())
+        self._watcher = self._watcher or asyncio.create_task(self._watch_profiles())
         self._mark_connected()
         logger.info("[AgentInbox] connected to %s as @%s", self.relay_url, self.agent_name)
         return True
 
     async def disconnect(self) -> None:
         self._closing = True
+        if self._watcher:
+            self._watcher.cancel()
+            self._watcher = None
         if self._reader:
             self._reader.cancel()
             self._reader = None
@@ -157,7 +163,8 @@ class AgentInboxAdapter(BasePlatformAdapter):
         # With a connect token the relay knows who we are, and claiming a
         # different agent_id is rejected. Only name ourselves when connecting
         # with the shared relay token.
-        frame: Dict[str, Any] = {"type": "register", "profiles": self._profile_names()}
+        self._reported_profiles = self._profile_names()
+        frame: Dict[str, Any] = {"type": "register", "profiles": self._reported_profiles}
         if self._uses_connect_token:
             return frame
         frame.update(
@@ -194,6 +201,29 @@ class AgentInboxAdapter(BasePlatformAdapter):
         # The relay restarting is routine (it is a small local process), so
         # reconnect here rather than waiting to be rebuilt.
         await self._reconnect_forever()
+
+    async def _watch_profiles(self) -> None:
+        """Tell the relay when a bot is added or removed on this machine.
+
+        Profiles are created in the desktop app, not here, so polling is what
+        keeps a new bot from waiting on a gateway restart to become a chat.
+        """
+        while not self._closing:
+            await asyncio.sleep(15)
+            if self._closing:
+                return
+            try:
+                current = self._profile_names()
+            except Exception:
+                continue
+            if current == self._reported_profiles:
+                continue
+            self._reported_profiles = current
+            logger.info("[AgentInbox] profiles changed: %s", ", ".join(current))
+            try:
+                await self._send_json({"type": "profiles", "profiles": current})
+            except Exception:
+                pass  # the reconnect path will resend on register
 
     async def _reconnect_forever(self) -> None:
         backoff = 1.0
