@@ -183,7 +183,16 @@ final class RelayStore {
         send(["type": "pair_code"])
     }
 
-    /// The single line to paste where the agent runs.
+    /// The address to open on the machine where the agent runs.
+    var setupURL: String {
+        let server = agentFacingURL.isEmpty ? relayURL : agentFacingURL
+        let host = server
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+        return "\(host)/setup?code=\(pairCode ?? "")"
+    }
+
+    /// Kept for anyone who would rather paste one line into a terminal.
     var connectCommand: String {
         let server = agentFacingURL.isEmpty ? relayURL : agentFacingURL
         return "curl -fsSL \(server)/connect.sh | sh -s \(pairCode ?? "…")"

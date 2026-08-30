@@ -268,6 +268,11 @@ function requireToken(req, res, next) {
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
+/** A page to open on the machine where the agent runs. */
+app.get("/setup", (_req, res) => {
+  res.sendFile(path.join(import.meta.dirname, "setup.html"));
+});
+
 /** The one-line setup script, with this relay's own address baked in. */
 app.get("/connect.sh", (_req, res) => {
   const script = fs
