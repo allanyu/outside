@@ -17,8 +17,6 @@ struct Agent: Codable, Identifiable, Hashable {
     var hostId: String?
     /// Which of the host's personas answers as this agent.
     var profile: String?
-    /// Personas this agent reported it can answer as (Hermes profiles, say).
-    var availableProfiles: [String]?
 
     var isOnline: Bool { status == "online" }
     var hasConnectToken: Bool { !(connectToken ?? "").isEmpty }
