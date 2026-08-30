@@ -537,9 +537,22 @@ function syncProfiles(connectionId, profiles, accountId) {
     })
   );
 
-  for (const [id, { name: profileName, display }] of wanted) {
-    const existing = db.getAgent(id);
+  // Agent ids are one global namespace, but profile names are not: every
+  // Hermes install has a "default", and most have short names that repeat
+  // across users. Keying a chat on the bare slug therefore hands the id to
+  // whoever connected first and silently gives every later account nothing --
+  // db.getAgent() finds the other tenant's row, the existing-agent branch
+  // adopts it, and the app shows an empty inbox. So the identity of a chat is
+  // (account, profile), and the id is only a handle we make unique.
+  const mine = db.listAgents(accountId);
+  const byProfile = new Map(mine.filter((a) => a.profile).map((a) => [a.profile, a]));
+  const live = new Set();
+
+  for (const [, { name: profileName, display }] of wanted) {
+    const existing = byProfile.get(profileName);
+    let id;
     if (existing) {
+      id = existing.id;
       db.setAgentHost(id, connectionId);
       db.setAgentStatus(id, "online");
       // The bot may have been renamed on the backend.
@@ -549,6 +562,9 @@ function syncProfiles(connectionId, profiles, accountId) {
         if (dm) db.renameThread(dm.id, display);
       }
     } else {
+      const base = slugify(profileName);
+      id = base;
+      for (let n = 2; db.getAgent(id); n++) id = `${base}-${n}`;
       db.createAgentWithToken({
         id,
         name: display,
@@ -560,6 +576,7 @@ function syncProfiles(connectionId, profiles, accountId) {
       });
       log(`chat added for '${display}'`);
     }
+    live.add(id);
     const { thread, created } = ensureDm(id);
     if (created) {
       toApp(accountId, { type: "thread", thread: threadPayload(thread.id) });
@@ -569,7 +586,15 @@ function syncProfiles(connectionId, profiles, accountId) {
 
   // A profile deleted on the backend stops being a chat.
   for (const hosted of db.agentsHostedBy(connectionId)) {
-    if (wanted.has(hosted.id)) continue;
+    if (hosted.account_id !== accountId) {
+      // Another tenant's agent, adopted by the id collision above. Hand it
+      // back rather than deleting someone else's chat.
+      db.setAgentHost(hosted.id, null);
+      db.setAgentStatus(hosted.id, "offline");
+      log(`released '${hosted.id}', it belongs to another account`);
+      continue;
+    }
+    if (live.has(hosted.id)) continue;
     log(`chat removed, profile '${hosted.name}' is gone`);
     removeAgent(hosted.id);
   }
